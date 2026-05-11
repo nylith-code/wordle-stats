@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordle Report Builder</title>
+<style>
+:root {
+  color-scheme: dark;
+  --app-bg: #0d1117;
+  --app-panel: rgba(255, 255, 255, 0.07);
+  --app-panel-strong: rgba(255, 255, 255, 0.11);
+  --app-border: rgba(255, 255, 255, 0.14);
+  --text: #f8fafc;
+  --muted: #aeb7c6;
+  --faint: #778193;
+  --gold: #f6c85f;
+  --green: #6aaa64;
+  --yellow: #c9b458;
+  --bad: #d66b6b;
+  --accent: #8dd8ff;
+  --radius: 24px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background: #0d1117;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+button, input, textarea, select { font: inherit; }
+.app-shell { width: min(1040px, calc(100vw - 32px)); margin: 0 auto; padding: 34px 0 64px; }
+.app-header { display: flex; justify-content: space-between; gap: 18px; align-items: start; margin-bottom: 24px; }
+.app-title h1 { margin: 0; font-size: clamp(34px, 6vw, 58px); letter-spacing: -.055em; line-height: .95; }
+.app-title p { margin: 10px 0 0; max-width: 680px; color: var(--muted); line-height: 1.5; }
+.glass {
+  border: 1px solid var(--app-border);
+  background: #151a22;
+  border-radius: 14px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .22);
+}
+.kicker { color: var(--gold); font-size: 13px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+.steps { display: grid; gap: 14px; }
+.step { padding: 22px; }
+.step-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.step-num { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; background: var(--gold); color: #191714; font-weight: 950; }
+.step h2 { margin: 0; font-size: 25px; letter-spacing: -.035em; }
+.step p { margin: 0; color: var(--muted); line-height: 1.5; }
+.step-desc { margin: 0 0 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+label { display: grid; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+input, textarea, select {
+  width: 100%;
+  color: var(--text);
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px;
+  outline: none;
+  padding: 13px 14px;
+}
+textarea { height: 360px; min-height: 360px; resize: vertical; line-height: 1.42; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; border-color: rgba(246, 200, 95, .38); background: #090d13; }
+input:focus, textarea:focus, select:focus { border-color: rgba(141,216,255,.72); box-shadow: 0 0 0 4px rgba(141,216,255,.12); }
+.query-box { display: grid; gap: 10px; margin-top: 16px; }
+.query-line {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,.13);
+}
+.query-line code { flex: 1; overflow-wrap: anywhere; color: #d7f1ff; font-size: 15px; }
+.copy-small, .btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 16px;
+  color: #111318;
+  background: var(--gold);
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform .16s ease, filter .16s ease, background .16s ease;
+}
+.copy-small { padding: 8px 12px; font-size: 12px; }
+.btn:hover, .copy-small:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.btn.secondary, .copy-small.secondary { color: var(--text); background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15); }
+.btn.danger, .link-danger { color: #d6a2a2; background: transparent; border: 1px solid rgba(214, 107, 107, .24); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.paste-grid { display: grid; grid-template-columns: 1.18fr .82fr; gap: 16px; align-items: start; }
+.paste-grid label { align-self: stretch; }
+.example-label { opacity: .72; }
+.example {
+  height: 360px;
+  min-height: 360px;
+  white-space: pre-wrap;
+  margin: 0;
+  padding: 15px;
+  overflow: auto;
+  color: #b7c0ce;
+  background: #10151d;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.42;
+}
+.hint { color: var(--faint); font-size: 13px; line-height: 1.45; margin-top: 8px; }
+.settings-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
+.notice { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(141,216,255,.10); color: #d7f1ff; border: 1px solid rgba(141,216,255,.20); }
+.notice.show { display: block; }
+.notice.success { background: rgba(106,170,100,.14); color: #c8efc4; border-color: rgba(106,170,100,.38); font-weight: 700; }
+.notice.success::before { content: "\2713"; display: inline-block; margin-right: 8px; color: #8fd28a; font-weight: 900; }
+.alias-roster-list { display: grid; gap: 0; margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.06); }
+.alias-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 14px; align-items: center; padding: 8px 14px; }
+.alias-row:nth-child(even) { background: rgba(255,255,255,.025); }
+.alias-row:hover { background: rgba(255,255,255,.045); }
+.alias-primary { font-weight: 700; color: var(--text); font-size: 14px; word-break: break-word; }
+.alias-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.alias-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 10px; border-radius: 999px; background: rgba(141,216,255,.10); border: 1px solid rgba(141,216,255,.28); color: #d7f1ff; font-size: 12px; font-weight: 700; }
+.alias-chip button { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0 4px; line-height: 1; font-size: 14px; opacity: .7; }
+.alias-chip button:hover { opacity: 1; }
+.alias-add input { width: auto; min-width: 160px; padding: 4px 10px; font-size: 12px; border-radius: 999px; border: 1px dashed rgba(255,255,255,.18); background: transparent; color: var(--muted); }
+.alias-add input:focus { border-style: solid; border-color: rgba(141,216,255,.72); box-shadow: 0 0 0 3px rgba(141,216,255,.10); color: var(--text); }
+.alias-empty { margin-top: 18px; padding: 14px; color: var(--muted); font-size: 13px; text-align: center; border: 1px dashed rgba(255,255,255,.12); border-radius: 8px; }
+.app-footer { margin-top: 28px; text-align: center; color: var(--faint); font-size: 11px; opacity: .7; letter-spacing: .04em; }
+.report-zone { margin-top: 18px; display: grid; gap: 18px; }
+.report-toolbar { padding: 22px; }
+.generate-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.generate-head h2 { margin: 0; font-size: 25px; letter-spacing: -.035em; }
+.generate-settings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; align-items: end; }
+.generate-primary { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 12px; }
+.generated-actions { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.12); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.report-toolbar strong { font-size: 18px; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#reportFrame { position: fixed; left: -20000px; top: 0; width: max-content; pointer-events: none; }
+@media (max-width: 860px) {
+  .app-header, .form-grid, .paste-grid, .settings-row, .generate-settings, .alias-row { grid-template-columns: 1fr; display: grid; }
+}
+</style>
+<style id="report-style">
+.wordle-report {
+  width: 1120px;
+  margin: 0 auto;
+  padding: 48px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at top left, rgba(106, 170, 100, 0.38), transparent 34rem),
+    radial-gradient(circle at bottom right, rgba(201, 180, 88, 0.30), transparent 34rem),
+    linear-gradient(135deg, #0f1115, #1a1f29 55%, #111318);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.wordle-report, .wordle-report * { box-sizing: border-box; }
+.wordle-report .hero { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 24px; align-items: stretch; }
+.wordle-report .panel { border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.09); border-radius: 30px; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.wordle-report .headline { padding: 34px; }
+.wordle-report .eyebrow { color: #f6c85f; font-weight: 800; text-transform: uppercase; letter-spacing: .16em; font-size: 14px; }
+.wordle-report h1 { margin: 10px 0 8px; font-size: 58px; line-height: .95; letter-spacing: -0.06em; }
+.wordle-report .sub { color: #b8c0cc; font-size: 20px; }
+.wordle-report .winner { padding: 30px; display: flex; flex-direction: column; justify-content: center; }
+.wordle-report .winner .label { color: #b8c0cc; text-transform: uppercase; letter-spacing: .14em; font-size: 13px; font-weight: 800; }
+.wordle-report .winner .name { margin-top: 10px; color: #f6c85f; font-size: 36px; line-height: 1; font-weight: 900; letter-spacing: -0.04em; }
+.wordle-report .winner .score { margin-top: 14px; font-size: 18px; color: #b8c0cc; }
+.wordle-report .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 22px 0; }
+.wordle-report .stat { padding: 22px; border-radius: 24px; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.13); }
+.wordle-report .stat .num { font-size: 34px; font-weight: 900; letter-spacing: -0.04em; }
+.wordle-report .stat .num.tight { font-size: 28px; line-height: 1.08; }
+.wordle-report .stat .cap { color: #b8c0cc; margin-top: 4px; font-size: 13px; }
+.wordle-report .board { padding: 20px; }
+.wordle-report .row { display: grid; grid-template-columns: 52px 1.3fr 92px 78px 78px repeat(7, 52px); gap: 14px; align-items: center; padding: 12px 14px; border-radius: 18px; }
+.wordle-report .row:nth-child(odd) { background: rgba(255,255,255,.055); }
+.wordle-report .head { color: #b8c0cc; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .11em; }
+.wordle-report .rank { color: #f6c85f; font-weight: 900; }
+.wordle-report .user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.wordle-report .metric { font-variant-numeric: tabular-nums; }
+.wordle-report .score-count { color: #dfe7ef; font-weight: 800; }
+.wordle-report .miss { color: #f08b8b; font-weight: 800; }
+.wordle-report .footer { margin-top: 16px; color: #b8c0cc; text-align: center; font-size: 13px; }
+.wordle-report .footer + .footer { margin-top: 6px; }
+</style>
+</head>
+<body>
+<main class="app-shell">
+  <header class="app-header">
+    <div class="app-title">
+      <h1>Wordle Stats Generator</h1>
+    </div>
+    <button class="btn link-danger" id="clearDataTop">Clear data</button>
+  </header>
+
+  <section class="steps">
+    <div class="glass step">
+      <div class="step-head">
+        <div class="step-num">1</div>
+        <h2>Search Discord for the next batch</h2>
+      </div>
+      <p class="step-desc" id="channelInstruction">Open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> in that channel so Discord starts a channel-limited search, then append this search text.</p>
+      <div class="query-box">
+        <div class="query-line"><code id="searchTerm">"Your group is on"</code><button class="copy-small" id="copySearch">Copy</button></div>
+      </div>
+    </div>
+
+    <div class="glass step">
+      <div class="step-head">
+        <div class="step-num">2</div>
+        <h2>Copy and paste search results</h2>
+      </div>
+      <div class="paste-grid">
+        <label>Paste Discord search results
+          <textarea id="pasteBox" placeholder="Paste copied Discord search results here..."></textarea>
+        </label>
+        <label class="example-label">Example of data to paste
+          <pre class="example">Wordle
+APP
+ — 5/6/26, 4:52 PM
+Your group is on a 74 day streak! 🔥 Here are yesterday's results:
+👑 3/6: @PlayerOne @PlayerTwo
+4/6: @PlayerThree @PlayerFour @PlayerFive
+5/6: @PlayerSix @PlayerSeven
+X/6: @PlayerEight
+7 solved and 1 unsolved games of Wordle
+
+Wordle
+APP
+ — 5/5/26, 4:35 PM
+Your group is on a 73 day streak! 🔥 Here are yesterday's results:
+👑 2/6: @PlayerTwo
+3/6: @PlayerFive
+4/6: @PlayerOne @PlayerSix
+6/6: @PlayerFour
+4 solved games of Wordle</pre>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" id="appendData">Add pasted data</button>
+      </div>
+      <div class="notice" id="notice"></div>
+    </div>
+
+    <div class="glass step">
+      <div class="step-head">
+        <div class="step-num">3</div>
+        <h2>Merge player aliases</h2>
+      </div>
+      <p class="step-desc">Merge usernames to handle players who changed their Discord name.</p>
+      <div id="aliasRoster"></div>
+    </div>
+  </section>
+
+  <section class="report-zone">
+    <div class="glass report-toolbar">
+      <div class="generate-head">
+        <div class="step-num">4</div>
+        <h2>Generate image</h2>
+      </div>
+      <div class="generate-settings">
+        <label>Server or group name
+          <input id="serverName" value="My Discord" autocomplete="off">
+        </label>
+        <label>Report timeframe
+          <select id="timeframe">
+            <option value="all">All stored games</option>
+            <option value="current">Current month</option>
+            <option value="last">Last month</option>
+          </select>
+        </label>
+        <label>Excluded dates
+          <input id="excludedDates" placeholder="YYYY-MM-DD, YYYY-MM-DD">
+        </label>
+      </div>
+      <div class="generate-primary">
+        <button class="btn" id="generateReport" type="button">Generate</button>
+      </div>
+      <div class="generated-actions" id="generatedActions" hidden>
+        <span class="hint" id="reportStatus">Report generated.</span>
+        <button class="btn secondary" id="copyPng">Copy image</button>
+        <button class="btn secondary" id="downloadPng">Download image</button>
+      </div>
+    </div>
+    <div id="reportFrame"></div>
+  </section>
+  <footer class="app-footer">v1.2</footer>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const STORE_KEY = 'wordleReport.v1';
+  const SCORE_ORDER = ['1', '2', '3', '4', '5', '6', 'X'];
+  const SCORE_VALUE = { '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, X: 7 };
+  // Anchor for the official NYT Wordle number, in puzzle-date form. Two known
+  // bot messages cross-check this: 2026-05-08 message → "Wordle No 1784" (about
+  // puzzle 2026-05-07), and 2026-04-04 message → "1750" (about puzzle 2026-04-03).
+  const WORDLE_ANCHOR = { puzzleDate: '2026-05-07', number: 1784 };
+  const DEFAULT_STATE = {
+    serverName: 'My Discord',
+    timeframe: 'all',
+    excludedDates: '',
+    rawText: '',
+    aliases: {}
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    serverName: $('serverName'),
+    timeframe: $('timeframe'),
+    excludedDates: $('excludedDates'),
+    pasteBox: $('pasteBox'),
+    channelInstruction: $('channelInstruction'),
+    searchTerm: $('searchTerm'),
+    notice: $('notice'),
+    reportFrame: $('reportFrame'),
+    reportStatus: $('reportStatus'),
+    generatedActions: $('generatedActions'),
+    generateReport: $('generateReport'),
+    copyPng: $('copyPng'),
+    downloadPng: $('downloadPng'),
+    aliasRoster: $('aliasRoster')
+  };
+
+  let state = loadState();
+  let lastRenderedReport = null;
+  let lastRenderedFileName = 'wordle-report.png';
+  let lastRenderedBlob = null;
+  let lastRenderedUrl = null;
+  let reportGenerated = false;
+
+  init();
+
+  function init() {
+    bindEvents();
+    bindAliasEvents();
+    syncInputsFromState();
+    refreshStatus();
+    renderAliasRoster();
+    markReportStale();
+  }
+
+  function bindEvents() {
+    ['serverName', 'timeframe', 'excludedDates'].forEach((key) => {
+      els[key].addEventListener('input', () => {
+        state[key] = els[key].value;
+        saveState();
+        refreshStatus();
+        markReportStale();
+      });
+    });
+
+    $('copySearch').addEventListener('click', () => copyText(els.searchTerm.textContent));
+    $('appendData').addEventListener('click', appendData);
+    $('clearDataTop').addEventListener('click', clearData);
+    $('generateReport').addEventListener('click', renderReport);
+    $('copyPng').addEventListener('click', copyPng);
+    $('downloadPng').addEventListener('click', downloadPng);
+  }
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      return {
+        ...DEFAULT_STATE,
+        ...saved,
+        aliases: { ...(saved.aliases || {}) }
+      };
+    } catch {
+      return { ...DEFAULT_STATE, aliases: {} };
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }
+
+  function syncInputsFromState() {
+    els.serverName.value = state.serverName || DEFAULT_STATE.serverName;
+    els.timeframe.value = state.timeframe || DEFAULT_STATE.timeframe;
+    els.excludedDates.value = state.excludedDates || '';
+  }
+
+  function appendData() {
+    const incoming = els.pasteBox.value.trim();
+    if (!incoming) return showNotice('Paste some Discord search results first.');
+    state.rawText = [state.rawText.trim(), incoming].filter(Boolean).join('\n\n');
+    els.pasteBox.value = '';
+    saveState();
+    refreshStatus();
+    renderAliasRoster();
+    markReportStale();
+    showNotice('Wordle stats recorded!', 'success');
+  }
+
+  function clearData() {
+    if (!confirm('Clear all stored Wordle bot text and aliases from this browser?')) return;
+    state.rawText = '';
+    state.aliases = {};
+    saveState();
+    refreshStatus();
+    renderAliasRoster();
+    markReportStale();
+    showNotice('Stored data cleared.');
+  }
+
+  function refreshStatus() {
+    const results = parseDailyResults(state.rawText || '');
+    const dated = results.map((r) => r.resultDate).filter(Boolean).sort();
+    const latest = dated.at(-1) || null;
+    const search = latest ? `after: ${latest} "Your group is on"` : '"Your group is on"';
+    els.channelInstruction.innerHTML = latest
+      ? `You last generated stats from <strong>${formatDate(latest)}</strong> using <strong>${results.length}</strong> days of stored data. To update the stats, open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> there so Discord starts a channel-limited search, then append this search text.`
+      : 'Open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> there so Discord starts a channel-limited search, then append this search text.';
+    els.searchTerm.textContent = search;
+  }
+
+  function parseDailyResults(text) {
+    const lines = text.split(/\r?\n/);
+    const results = [];
+    let sawWordle = false;
+    let sawApp = false;
+    let timestampLine = null;
+    let current = null;
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      if (current) {
+        const scoreMatch = line.match(/^(?:\S+\s+)?([1-6X])\/6:\s*(.*)$/u);
+        if (scoreMatch) {
+          const bucket = scoreMatch[1];
+          for (const user of parseMentions(scoreMatch[2])) current.scores[user] = bucket;
+          continue;
+        }
+        if (/\d+ solved(?: and \d+ unsolved)? games? of Wordle/.test(line)) {
+          results.push(current);
+          current = null;
+          sawWordle = false;
+          sawApp = false;
+          timestampLine = null;
+          continue;
+        }
+        if (line === 'Wordle') {
+          results.push(current);
+          current = null;
+          sawWordle = true;
+          sawApp = false;
+          timestampLine = null;
+          continue;
+        }
+        if (line.startsWith('Your group is on')) {
+          const streakMatch = line.match(/Your group is on (?:a|an) (\d+) day streak/);
+          if (streakMatch) {
+            results.push(current);
+            current = { streak: Number(streakMatch[1]), timestampLine, scores: {}, resultDate: null };
+            continue;
+          }
+        }
+        continue;
+      }
+
+      if (line === 'Wordle') {
+        sawWordle = true;
+        sawApp = false;
+        timestampLine = null;
+        continue;
+      }
+      if (sawWordle && line === 'APP') {
+        sawApp = true;
+        continue;
+      }
+      if (!sawApp) continue;
+      if (line.includes('—') && timestampLine === null) {
+        timestampLine = line;
+        continue;
+      }
+      if (line.startsWith('Your group is on')) {
+        const streakMatch = line.match(/Your group is on (?:a|an) (\d+) day streak/);
+        if (streakMatch) current = { streak: Number(streakMatch[1]), timestampLine, scores: {}, resultDate: null };
+      }
+    }
+
+    return inferResultDates(dedupeResults(results));
+  }
+
+  function parseMentions(blob) {
+    const users = [];
+    const re = /@(.+?)(?=\s@|$)/gu;
+    let match;
+    while ((match = re.exec(blob)) !== null) {
+      const user = match[1].trim();
+      if (user) users.push(user);
+    }
+    return users;
+  }
+
+  function dedupeResults(results) {
+    const byStreak = new Map();
+    for (const result of results) {
+      const existing = byStreak.get(result.streak);
+      if (!existing || Object.keys(result.scores).length > Object.keys(existing.scores).length) byStreak.set(result.streak, result);
+    }
+    return [...byStreak.values()].sort((a, b) => a.streak - b.streak);
+  }
+
+  function inferResultDates(results) {
+    // Each message votes for a baseDate via streak math: baseDate = postedDate - streak.
+    // Bot posts "yesterday's results", so puzzle = postedDate - 1, and streak math
+    // gives every streak a unique date relative to the same baseDate.
+    //
+    // Discord renders timestamps in the user's local timezone, but the bot's tz may
+    // differ. Posts near midnight in user-local time are most likely to be tz-edge
+    // shifted (e.g. a bot post at 11:30 PM bot-tz can land just past midnight in
+    // user-tz, voting for baseDate+1). We prefer "safe-hour" votes (4 AM – 10 PM)
+    // and only fall back to all votes when there are none.
+    const safeCounts = new Map();
+    const allCounts = new Map();
+    for (const result of results) {
+      const postedDate = parseTimestampDate(result.timestampLine);
+      if (!postedDate) continue;
+      const base = addDays(postedDate, -result.streak);
+      allCounts.set(base, (allCounts.get(base) || 0) + 1);
+      const hour = parseTimestampHour(result.timestampLine);
+      if (hour === null || (hour >= 4 && hour <= 22)) {
+        safeCounts.set(base, (safeCounts.get(base) || 0) + 1);
+      }
+    }
+    const counts = safeCounts.size ? safeCounts : allCounts;
+    let baseDate = null;
+    let bestCount = -1;
+    for (const [candidate, count] of counts) {
+      if (count > bestCount) {
+        baseDate = candidate;
+        bestCount = count;
+      }
+    }
+    if (!baseDate) return results;
+    for (const result of results) result.resultDate = addDays(baseDate, result.streak - 1);
+    return results;
+  }
+
+  function parseTimestampDate(line) {
+    if (!line) return null;
+    const match = line.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (!match) return null;
+    let [, month, day, year] = match.map(Number);
+    if (year < 100) year += 2000;
+    return isoDate(year, month, day);
+  }
+
+  function parseTimestampHour(line) {
+    if (!line) return null;
+    const match = line.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hour < 12) hour += 12;
+    else if (ampm === 'AM' && hour === 12) hour = 0;
+    return hour;
+  }
+
+  function filterResults(results, timeframe, excludedDates) {
+    const period = getPeriod(timeframe);
+    return results.filter((result) => {
+      if (result.resultDate && excludedDates.has(result.resultDate)) return false;
+      if (!period) return true;
+      return result.resultDate && result.resultDate >= period.start && result.resultDate <= period.end;
+    });
+  }
+
+  function buildStats(results) {
+    const stats = new Map();
+    for (const result of results) {
+      const solvedValues = Object.values(result.scores).filter((s) => s !== 'X').map((s) => SCORE_VALUE[s]);
+      const bestScore = solvedValues.length ? Math.min(...solvedValues) : null;
+      for (const [user, score] of Object.entries(result.scores)) {
+        const stat = ensureStat(stats, user);
+        stat.played += 1;
+        stat.buckets[score] += 1;
+        if (bestScore !== null && SCORE_VALUE[score] === bestScore) stat.wins += 1;
+      }
+    }
+    return stats;
+  }
+
+  function ensureStat(stats, user) {
+    if (!stats.has(user)) stats.set(user, { played: 0, wins: 0, buckets: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, X: 0 } });
+    return stats.get(user);
+  }
+
+  function averageScore(stat) {
+    return SCORE_ORDER.reduce((sum, score) => sum + SCORE_VALUE[score] * stat.buckets[score], 0) / (stat.played || 1);
+  }
+
+  function solveRate(stat) {
+    return stat.played ? (stat.played - stat.buckets.X) / stat.played : 0;
+  }
+
+  function qualifiedRows(stats, minGames) {
+    return [...stats.entries()]
+      .filter(([, stat]) => stat.played >= minGames)
+      .sort((a, b) => averageScore(a[1]) - averageScore(b[1]) || b[1].played - a[1].played || a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+  }
+
+  function renderReport() {
+    const allResults = parseDailyResults(state.rawText || '');
+    const excludedDates = parseExcludedDates(state.excludedDates || '');
+    const filtered = filterResults(allResults, state.timeframe || 'all', excludedDates);
+    const results = applyAliases(filtered, state.aliases || {});
+    const stats = buildStats(results);
+    const minGames = Math.floor(results.length / 4);
+    const rows = qualifiedRows(stats, minGames);
+
+    if (!allResults.length) {
+      els.reportFrame.innerHTML = '';
+      lastRenderedReport = null;
+      reportGenerated = false;
+      updateReportControls();
+      showNotice('Paste Discord Wordle bot results before generating a report.');
+      return;
+    }
+
+    const leaders = rows.length ? rows.filter((row) => averageScore(row[1]) === averageScore(rows[0][1])) : [];
+    const totalEntries = results.reduce((sum, result) => sum + Object.keys(result.scores).length, 0);
+    const avgPlayers = results.length ? totalEntries / results.length : 0;
+    const bestDay = maxBy(results, (result) => Object.keys(result.scores).length);
+    const hardestDay = maxBy(results, dailyAverage);
+    const crownLeader = maxBy(rows, (row) => row[1].wins);
+    const cleanest = maxBy(rows, (row) => solveRate(row[1]) * 100000 + row[1].played);
+    const period = periodLabel(results, state.timeframe || 'all');
+    const community = (state.serverName || 'My Discord').trim() || 'My Discord';
+    const excludedText = excludedDates.size ? [...excludedDates].sort().map(formatDate).join(', ') : 'none';
+
+    const rowHtml = rows.map(([user, stat], index) => playerRow(index + 1, user, stat)).join('');
+    const winnerNames = leaders.length ? leaders.map(([user]) => escapeHtml(user)).join(', ') : 'No qualifier';
+    const winnerScore = leaders.length ? `${averageScore(leaders[0][1]).toFixed(3)} average score` : '-';
+    const bestDayText = bestDay?.resultDate ? `${formatShortDate(bestDay.resultDate)} (Wordle #${wordleNumber(bestDay.resultDate)}): ${Object.keys(bestDay.scores).length} players` : '-';
+    const hardestDayText = hardestDay?.resultDate ? `${formatShortDate(hardestDay.resultDate)} (Wordle #${wordleNumber(hardestDay.resultDate)}): ${dailyAverage(hardestDay).toFixed(2)} avg` : '-';
+    const crownText = crownLeader ? `${crownLeader[0]}: ${crownLeader[1].wins} crowns` : '-';
+    const cleanText = cleanest ? `${cleanest[0]}: ${(solveRate(cleanest[1]) * 100).toFixed(0)}% solved` : '-';
+
+    els.reportFrame.innerHTML = `<main class="wordle-report" id="shareReport">
+      <section class="hero">
+        <div class="panel headline">
+          <div class="eyebrow">${escapeHtml(community)} Wordle</div>
+          <h1>Wordle Standings</h1>
+          <div class="sub">${escapeHtml(period)} · minimum ${minGames} games</div>
+        </div>
+        <div class="panel winner">
+          <div class="label">Winner</div>
+          <div class="name">${winnerNames}</div>
+          <div class="score">${winnerScore}</div>
+        </div>
+      </section>
+      <section class="stats">
+        <div class="stat"><div class="num">${results.length}</div><div class="cap">counted days</div></div>
+        <div class="stat"><div class="num">${avgPlayers.toFixed(1)}</div><div class="cap">avg players/day</div></div>
+        <div class="stat"><div class="num tight">${escapeHtml(crownText)}</div><div class="cap">most daily crowns</div></div>
+        <div class="stat"><div class="num tight">${escapeHtml(cleanText)}</div><div class="cap">cleanest solver</div></div>
+      </section>
+      <section class="panel board">
+        <div class="row head"><div>#</div><div>Player</div><div>Avg</div><div>Games</div><div>Crowns</div><div>1/6</div><div>2/6</div><div>3/6</div><div>4/6</div><div>5/6</div><div>6/6</div><div>Miss</div></div>
+        ${rowHtml || '<div class="row"><div></div><div class="user">No qualified players</div></div>'}
+      </section>
+      <div class="footer">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
+      <div class="footer">Excluded dates: ${escapeHtml(excludedText)}</div>
+    </main>`;
+    lastRenderedReport = $('shareReport');
+    lastRenderedFileName = fileNameForReport(state.timeframe || 'all');
+    reportGenerated = true;
+    lastRenderedBlob = null;
+    if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
+    lastRenderedUrl = null;
+    updateReportControls();
+    refreshStatus();
+  }
+
+  function markReportStale() {
+    reportGenerated = false;
+    lastRenderedReport = null;
+    lastRenderedBlob = null;
+    if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
+    lastRenderedUrl = null;
+    els.reportFrame.innerHTML = '';
+    updateReportControls();
+  }
+
+  function updateReportControls() {
+    els.reportStatus.textContent = reportGenerated ? 'Report generated.' : '';
+    els.generateReport.hidden = reportGenerated;
+    els.generatedActions.hidden = !reportGenerated;
+  }
+
+  function playerRow(rank, user, stat) {
+    const b = stat.buckets;
+    return `<div class="row">
+      <div class="rank">${rank}</div>
+      <div class="user">${escapeHtml(user)}</div>
+      <div class="metric">${averageScore(stat).toFixed(3)}</div>
+      <div class="metric">${stat.played}</div>
+      <div class="metric">${stat.wins}</div>
+      <div class="metric score-count">${b['1']}</div>
+      <div class="metric score-count">${b['2']}</div>
+      <div class="metric score-count">${b['3']}</div>
+      <div class="metric score-count">${b['4']}</div>
+      <div class="metric score-count">${b['5']}</div>
+      <div class="metric score-count">${b['6']}</div>
+      <div class="metric miss">${b.X}</div>
+    </div>`;
+  }
+
+  async function copyPng() {
+    els.reportStatus.textContent = 'Preparing image...';
+    const blob = lastRenderedBlob || await reportBlob();
+    if (!blob) {
+      els.reportStatus.textContent = 'Report generated.';
+      return;
+    }
+    lastRenderedBlob = blob;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      els.reportStatus.textContent = 'Image copied.';
+    } catch (error) {
+      els.reportStatus.textContent = 'Report generated.';
+      showNotice(`Clipboard copy was blocked by the browser. Use Download image instead. (${error.message})`);
+    }
+  }
+
+  async function downloadPng() {
+    els.reportStatus.textContent = 'Preparing image...';
+    const blob = lastRenderedBlob || await reportBlob();
+    if (!blob) {
+      els.reportStatus.textContent = 'Report generated.';
+      return;
+    }
+    lastRenderedBlob = blob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = lastRenderedFileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    els.reportStatus.textContent = 'Image downloaded.';
+  }
+
+  async function reportBlob() {
+    if (!lastRenderedReport) {
+      showNotice('Generate a report first.');
+      return null;
+    }
+    const canvas = await renderNodeToCanvas(lastRenderedReport);
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  }
+
+  async function renderNodeToCanvas(node) {
+    const scale = 2;
+    const width = Math.ceil(node.offsetWidth);
+    const height = Math.ceil(node.offsetHeight);
+    const style = $('report-style').textContent;
+    const xhtml = `<div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${node.outerHTML}</div>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+    // Chromium taints the canvas when an <img> loads an SVG-foreignObject from a blob: URL
+    // even on same origin, so we serialize to a data: URL which renders without tainting.
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const img = new Image();
+    img.decoding = 'async';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('SVG image failed to load'));
+      img.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111318';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function resolveAlias(name, aliases) {
+    const seen = new Set();
+    let current = name;
+    while (aliases[current] && !seen.has(current)) {
+      seen.add(current);
+      current = aliases[current];
+    }
+    return current;
+  }
+
+  function applyAliases(results, aliases) {
+    if (!aliases || !Object.keys(aliases).length) return results;
+    return results.map((result) => {
+      const merged = {};
+      for (const [user, score] of Object.entries(result.scores)) {
+        const canonical = resolveAlias(user, aliases);
+        const existing = merged[canonical];
+        if (!existing || SCORE_VALUE[score] < SCORE_VALUE[existing]) merged[canonical] = score;
+      }
+      return { ...result, scores: merged };
+    });
+  }
+
+  function detectedUsers() {
+    const all = parseDailyResults(state.rawText || '');
+    const set = new Set();
+    for (const r of all) for (const u of Object.keys(r.scores)) set.add(u);
+    return set;
+  }
+
+  function renderAliasRoster() {
+    const detected = detectedUsers();
+    const aliases = state.aliases || {};
+    const aliasKeys = new Set(Object.keys(aliases));
+
+    const primaries = new Set();
+    for (const u of detected) if (!aliasKeys.has(u)) primaries.add(u);
+    for (const p of Object.values(aliases)) primaries.add(p);
+
+    if (!primaries.size) {
+      els.aliasRoster.innerHTML = '<div class="alias-empty">Player names will appear here once you add Discord data above.</div>';
+      return;
+    }
+
+    const groupMap = new Map();
+    for (const p of primaries) groupMap.set(p, []);
+    for (const [a, p] of Object.entries(aliases)) {
+      if (!groupMap.has(p)) groupMap.set(p, []);
+      groupMap.get(p).push(a);
+    }
+
+    const sortNames = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+    const sortedPrimaries = [...primaries].sort(sortNames);
+
+    const eligible = new Set();
+    for (const u of detected) if (!aliasKeys.has(u)) eligible.add(u);
+    for (const p of Object.values(aliases)) eligible.add(p);
+    const datalistHtml = [...eligible].sort(sortNames)
+      .map((u) => `<option value="${escapeHtml(u)}"></option>`).join('');
+
+    const rowsHtml = sortedPrimaries.map((primary) => {
+      const groupAliases = (groupMap.get(primary) || []).slice().sort(sortNames);
+      const chipsHtml = groupAliases.map((a) => `<span class="alias-chip"><span>${escapeHtml(a)}</span><button type="button" data-remove-alias="${escapeHtml(a)}" aria-label="Remove ${escapeHtml(a)}">×</button></span>`).join('');
+      return `<div class="alias-row">
+        <div class="alias-primary">${escapeHtml(primary)}</div>
+        <div class="alias-chips">${chipsHtml}<span class="alias-add"><input type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
+      </div>`;
+    }).join('');
+
+    els.aliasRoster.innerHTML = `<datalist id="aliasDatalist">${datalistHtml}</datalist><div class="alias-roster-list">${rowsHtml}</div>`;
+  }
+
+  function addAlias(primary, alias) {
+    if (!primary || !alias) return;
+    if (alias === primary) {
+      showNotice('A player cannot be their own alias.');
+      return;
+    }
+    state.aliases = state.aliases || {};
+    if (state.aliases[alias] === primary) return;
+    if (state.aliases[alias]) {
+      showNotice(`${alias} is already merged into ${state.aliases[alias]}. Remove that first.`);
+      return;
+    }
+    for (const [a, p] of Object.entries(state.aliases)) {
+      if (p === alias) state.aliases[a] = primary;
+    }
+    state.aliases[alias] = primary;
+    saveState();
+    renderAliasRoster();
+    markReportStale();
+    showNotice(`Merged ${alias} → ${primary}.`, 'success');
+  }
+
+  function removeAlias(alias) {
+    if (!state.aliases || !(alias in state.aliases)) return;
+    const primary = state.aliases[alias];
+    delete state.aliases[alias];
+    saveState();
+    renderAliasRoster();
+    markReportStale();
+    showNotice(`Unmerged ${alias} from ${primary}.`);
+  }
+
+  function bindAliasEvents() {
+    els.aliasRoster.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove-alias]');
+      if (!btn) return;
+      removeAlias(btn.getAttribute('data-remove-alias'));
+    });
+    els.aliasRoster.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const input = e.target;
+      if (!input.matches || !input.matches('input[data-add-for]')) return;
+      e.preventDefault();
+      commitAddAlias(input);
+    });
+    els.aliasRoster.addEventListener('change', (e) => {
+      const input = e.target;
+      if (!input.matches || !input.matches('input[data-add-for]')) return;
+      commitAddAlias(input);
+    });
+  }
+
+  function commitAddAlias(input) {
+    const primary = input.getAttribute('data-add-for');
+    const alias = input.value.trim();
+    if (!alias) return;
+    addAlias(primary, alias);
+  }
+
+  function parseExcludedDates(value) {
+    return new Set((value || '').split(/[\s,]+/).map((v) => v.trim()).filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v)));
+  }
+
+  function getPeriod(timeframe) {
+    if (timeframe === 'all') return null;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    if (timeframe === 'current') {
+      return { start: isoDate(year, month, 1), end: isoDate(year, month + 1, 0) };
+    }
+    if (timeframe === 'last') {
+      return { start: isoDate(year, month - 1, 1), end: isoDate(year, month, 0) };
+    }
+    return null;
+  }
+
+  function periodLabel(results, timeframe) {
+    const dates = results.map((r) => r.resultDate).filter(Boolean).sort();
+    if (timeframe === 'current') return monthLabel(new Date());
+    if (timeframe === 'last') {
+      const now = new Date();
+      return monthLabel(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    }
+    if (!dates.length) return 'All Time';
+    return `${formatDate(dates[0])} to ${formatDate(dates.at(-1))}`;
+  }
+
+  function monthLabel(d) {
+    return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  }
+
+  function dailyAverage(result) {
+    const scores = Object.values(result.scores);
+    return scores.length ? scores.reduce((sum, score) => sum + SCORE_VALUE[score], 0) / scores.length : 0;
+  }
+
+  function solvedCount(result) {
+    return Object.values(result.scores).filter((score) => score !== 'X').length;
+  }
+
+  function maxBy(items, key) {
+    let best = null;
+    let bestValue = -Infinity;
+    for (const item of items) {
+      const value = key(item);
+      if (value > bestValue) {
+        best = item;
+        bestValue = value;
+      }
+    }
+    return best;
+  }
+
+  function isoDate(year, month, day) {
+    const d = new Date(Date.UTC(year, month - 1, day));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function addDays(iso, days) {
+    const [year, month, day] = iso.split('-').map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day + days));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function wordleNumber(puzzleDate) {
+    if (!puzzleDate) return null;
+    const [ay, am, ad] = WORDLE_ANCHOR.puzzleDate.split('-').map(Number);
+    const [y, m, d] = puzzleDate.split('-').map(Number);
+    const days = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ay, am - 1, ad)) / 86400000);
+    return WORDLE_ANCHOR.number + days;
+  }
+
+  function formatDate(iso) {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  }
+
+  function formatShortDate(iso) {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+  }
+
+  function fileNameForReport(timeframe) {
+    const prefix = (state.serverName || 'wordle').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'wordle';
+    return `${prefix}-${timeframe}-wordle.png`;
+  }
+
+  async function copyText(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      showNotice('Search text copied.');
+    } catch {
+      showNotice('Could not copy automatically. Select the search text and copy it manually.');
+    }
+  }
+
+  function showNotice(message, variant) {
+    els.notice.textContent = message;
+    els.notice.classList.remove('success');
+    if (variant) els.notice.classList.add(variant);
+    els.notice.classList.add('show');
+    clearTimeout(showNotice.timer);
+    showNotice.timer = setTimeout(() => els.notice.classList.remove('show'), 5200);
+  }
+})();
+</script>
+</body>
+</html>
