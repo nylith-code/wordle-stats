@@ -119,7 +119,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(141,216,255,.72);
 .notice.success { background: rgba(106,170,100,.14); color: #c8efc4; border-color: rgba(106,170,100,.38); font-weight: 700; }
 .notice.success::before { content: "\2713"; display: inline-block; margin-right: 8px; color: #8fd28a; font-weight: 900; }
 .alias-roster-list { display: grid; gap: 0; margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.06); }
-.alias-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 14px; align-items: center; padding: 8px 14px; }
+.alias-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr auto; gap: 14px; align-items: center; padding: 8px 14px; }
 .alias-row:nth-child(even) { background: rgba(255,255,255,.025); }
 .alias-row:hover { background: rgba(255,255,255,.045); }
 .alias-primary { font-weight: 700; color: var(--text); font-size: 14px; word-break: break-word; }
@@ -129,6 +129,9 @@ input:focus, textarea:focus, select:focus { border-color: rgba(141,216,255,.72);
 .alias-chip button:hover { opacity: 1; }
 .alias-add input { width: auto; min-width: 160px; padding: 4px 10px; font-size: 12px; border-radius: 999px; border: 1px dashed rgba(255,255,255,.18); background: transparent; color: var(--muted); }
 .alias-add input:focus { border-style: solid; border-color: rgba(141,216,255,.72); box-shadow: 0 0 0 3px rgba(141,216,255,.10); color: var(--text); }
+.flag-toggle { display: inline-flex; align-items: center; gap: 6px; width: auto; padding: 7px 10px; color: var(--muted); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 800; }
+.flag-toggle.active { color: #ffd4d4; background: rgba(214,107,107,.14); border-color: rgba(214,107,107,.36); }
+.flag-toggle:hover { color: var(--text); background: rgba(255,255,255,.10); }
 .alias-empty { margin-top: 18px; padding: 14px; color: var(--muted); font-size: 13px; text-align: center; border: 1px dashed rgba(255,255,255,.12); border-radius: 8px; }
 .app-footer { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.09); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; color: var(--faint); font-size: 12px; opacity: .82; letter-spacing: .02em; }
 .app-footer a { color: var(--muted); text-decoration: none; }
@@ -183,6 +186,9 @@ input:focus, textarea:focus, select:focus { border-color: rgba(141,216,255,.72);
 .wordle-report .head { color: #b8c0cc; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .11em; }
 .wordle-report .rank { color: #f6c85f; font-weight: 900; }
 .wordle-report .user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.wordle-report .flagged-name { display: inline-flex; align-items: baseline; gap: 7px; min-width: 0; max-width: 100%; }
+.wordle-report .flagged-name .flag { flex: 0 0 auto; font-size: .86em; }
+.wordle-report .flagged-name .player-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wordle-report .metric { font-variant-numeric: tabular-nums; }
 .wordle-report .score-count { color: #dfe7ef; font-weight: 800; }
 .wordle-report .miss { color: #f08b8b; font-weight: 800; }
@@ -259,7 +265,7 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
         <div class="step-num">3</div>
         <h2>Merge player aliases</h2>
       </div>
-      <p class="step-desc">Merge usernames to handle players who changed their Discord name.</p>
+      <p class="step-desc">Merge usernames to handle players who changed their Discord name, or flag players with a history of Unsportsmanlike-Conduct.</p>
       <div id="aliasRoster"></div>
     </div>
   </section>
@@ -297,7 +303,7 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     <div id="reportFrame"></div>
   </section>
   <footer class="app-footer">
-    <span>v1.4</span>
+    <span>v1.5</span>
     <span>Created by Nylith</span>
   </footer>
 </main>
@@ -318,7 +324,8 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     timeframe: 'all',
     excludedDates: '',
     rawText: '',
-    aliases: {}
+    aliases: {},
+    flaggedUsers: []
   };
 
   const $ = (id) => document.getElementById(id);
@@ -381,10 +388,11 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
       return {
         ...DEFAULT_STATE,
         ...saved,
-        aliases: { ...(saved.aliases || {}) }
+        aliases: { ...(saved.aliases || {}) },
+        flaggedUsers: Array.isArray(saved.flaggedUsers) ? saved.flaggedUsers : []
       };
     } catch {
-      return { ...DEFAULT_STATE, aliases: {} };
+      return { ...DEFAULT_STATE, aliases: {}, flaggedUsers: [] };
     }
   }
 
@@ -411,9 +419,10 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
   }
 
   function clearData() {
-    if (!confirm('Clear all stored Wordle bot text and aliases from this browser?')) return;
+    if (!confirm('Clear all stored Wordle bot text, aliases, and flags from this browser?')) return;
     state.rawText = '';
     state.aliases = {};
+    state.flaggedUsers = [];
     saveState();
     refreshStatus();
     renderAliasRoster();
@@ -649,14 +658,15 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     const period = periodLabel(results, state.timeframe || 'all');
     const community = (state.serverName || 'My Discord').trim() || 'My Discord';
     const excludedText = excludedDates.size ? [...excludedDates].sort().map(formatDate).join(', ') : 'none';
+    const flaggedUsers = flaggedUserSet(state.aliases || {});
 
-    const rowHtml = rows.map(([user, stat], index) => playerRow(index + 1, user, stat)).join('');
-    const winnerNames = leaders.length ? leaders.map(([user]) => escapeHtml(user)).join(', ') : 'No qualifier';
+    const rowHtml = rows.map(([user, stat], index) => playerRow(index + 1, user, stat, flaggedUsers)).join('');
+    const winnerNames = leaders.length ? leaders.map(([user]) => playerNameHtml(user, flaggedUsers)).join(', ') : 'No qualifier';
     const winnerScore = leaders.length ? `${averageScore(leaders[0][1]).toFixed(3)} average score` : '-';
     const bestDayText = bestDay?.resultDate ? `${formatShortDate(bestDay.resultDate)} (Wordle #${wordleNumber(bestDay.resultDate)}): ${Object.keys(bestDay.scores).length} players` : '-';
     const hardestDayText = hardestDay?.resultDate ? `${formatShortDate(hardestDay.resultDate)} (Wordle #${wordleNumber(hardestDay.resultDate)}): ${dailyAverage(hardestDay).toFixed(2)} avg` : '-';
-    const crownText = crownLeader ? `${crownLeader[0]}: ${crownLeader[1].wins} crowns` : '-';
-    const cleanText = cleanest ? `${cleanest[0]}: ${(solveRate(cleanest[1]) * 100).toFixed(0)}% solved` : '-';
+    const crownText = crownLeader ? `${playerNameHtml(crownLeader[0], flaggedUsers)}: ${crownLeader[1].wins} crowns` : '-';
+    const cleanText = cleanest ? `${playerNameHtml(cleanest[0], flaggedUsers)}: ${(solveRate(cleanest[1]) * 100).toFixed(0)}% solved` : '-';
 
     els.reportFrame.innerHTML = `<main class="wordle-report" id="shareReport">
       <section class="hero">
@@ -674,8 +684,8 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
       <section class="stats">
         <div class="stat"><div class="num">${results.length}</div><div class="cap">counted days</div></div>
         <div class="stat"><div class="num">${avgPlayers.toFixed(1)}</div><div class="cap">avg players/day</div></div>
-        <div class="stat"><div class="num tight">${escapeHtml(crownText)}</div><div class="cap">most daily crowns</div></div>
-        <div class="stat"><div class="num tight">${escapeHtml(cleanText)}</div><div class="cap">cleanest solver</div></div>
+        <div class="stat"><div class="num tight">${crownText}</div><div class="cap">most daily crowns</div></div>
+        <div class="stat"><div class="num tight">${cleanText}</div><div class="cap">cleanest solver</div></div>
       </section>
       <section class="panel board">
         <div class="row head"><div>#</div><div>Player</div><div>Avg</div><div>Games</div><div>Crowns</div><div>1/6</div><div>2/6</div><div>3/6</div><div>4/6</div><div>5/6</div><div>6/6</div><div>Miss</div></div>
@@ -710,11 +720,21 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     els.generatedActions.hidden = !reportGenerated;
   }
 
-  function playerRow(rank, user, stat) {
+  function flaggedUserSet(aliases) {
+    return new Set((state.flaggedUsers || []).map((user) => resolveAlias(user, aliases)));
+  }
+
+  function playerNameHtml(user, flaggedUsers) {
+    if (!flaggedUsers.has(user)) return escapeHtml(user);
+    const tooltip = 'History of Unsportsmanlike-Conduct';
+    return `<span class="flagged-name"><span class="flag" title="${tooltip}" aria-label="${tooltip}">🚩</span><span class="player-label">${escapeHtml(user)}</span></span>`;
+  }
+
+  function playerRow(rank, user, stat, flaggedUsers) {
     const b = stat.buckets;
     return `<div class="row">
       <div class="rank">${rank}</div>
-      <div class="user">${escapeHtml(user)}</div>
+      <div class="user">${playerNameHtml(user, flaggedUsers)}</div>
       <div class="metric">${averageScore(stat).toFixed(3)}</div>
       <div class="metric">${stat.played}</div>
       <div class="metric">${stat.wins}</div>
@@ -832,6 +852,7 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     const detected = detectedUsers();
     const aliases = state.aliases || {};
     const aliasKeys = new Set(Object.keys(aliases));
+    const flaggedUsers = flaggedUserSet(aliases);
 
     const primaries = new Set();
     for (const u of detected) if (!aliasKeys.has(u)) primaries.add(u);
@@ -861,9 +882,11 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     const rowsHtml = sortedPrimaries.map((primary) => {
       const groupAliases = (groupMap.get(primary) || []).slice().sort(sortNames);
       const chipsHtml = groupAliases.map((a) => `<span class="alias-chip"><span>${escapeHtml(a)}</span><button type="button" data-remove-alias="${escapeHtml(a)}" aria-label="Remove ${escapeHtml(a)}">×</button></span>`).join('');
+      const flagged = flaggedUsers.has(primary);
       return `<div class="alias-row">
         <div class="alias-primary">${escapeHtml(primary)}</div>
         <div class="alias-chips">${chipsHtml}<span class="alias-add"><input type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
+        <button type="button" class="flag-toggle${flagged ? ' active' : ''}" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" title="History of Unsportsmanlike-Conduct">🚩 ${flagged ? 'Flagged' : 'Flag'}</button>
       </div>`;
     }).join('');
 
@@ -902,8 +925,27 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     showNotice(`Unmerged ${alias} from ${primary}.`);
   }
 
+  function toggleFlag(user) {
+    const aliases = state.aliases || {};
+    const canonical = resolveAlias(user, aliases);
+    const current = state.flaggedUsers || [];
+    const alreadyFlagged = current.some((flaggedUser) => resolveAlias(flaggedUser, aliases) === canonical);
+    state.flaggedUsers = alreadyFlagged
+      ? current.filter((flaggedUser) => resolveAlias(flaggedUser, aliases) !== canonical)
+      : [...current, canonical];
+    saveState();
+    renderAliasRoster();
+    markReportStale();
+    showNotice(`${canonical} ${alreadyFlagged ? 'unflagged' : 'flagged'}.`, alreadyFlagged ? undefined : 'success');
+  }
+
   function bindAliasEvents() {
     els.aliasRoster.addEventListener('click', (e) => {
+      const flagBtn = e.target.closest('[data-toggle-flag]');
+      if (flagBtn) {
+        toggleFlag(flagBtn.getAttribute('data-toggle-flag'));
+        return;
+      }
       const btn = e.target.closest('[data-remove-alias]');
       if (!btn) return;
       removeAlias(btn.getAttribute('data-remove-alias'));
