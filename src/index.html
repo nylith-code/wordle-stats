@@ -81,14 +81,14 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     </div>
   </section>
 
-  <section class="mt-5 grid gap-5">
+  <section class="mt-5">
     <div class="rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
       <div class="mb-5 flex items-center gap-4">
         <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-300 font-black text-slate-950">4</div>
         <h2 class="m-0 text-2xl font-bold tracking-tight">Generate image</h2>
       </div>
-      <div class="grid items-end gap-4 md:grid-cols-3">
-        <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300">Server or group name
+      <div class="grid items-end gap-4 md:grid-cols-4">
+        <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300 md:col-span-2">Server or group name
           <input class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="serverName" value="My Discord" autocomplete="off">
         </label>
         <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300">Report timeframe
@@ -102,14 +102,19 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
           <input class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="excludedDates" placeholder="YYYY-MM-DD, YYYY-MM-DD">
         </label>
       </div>
-      <div class="mt-4 flex items-center gap-3 border-t border-white/10 pt-4">
-        <button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-4 py-2 font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="generateReport" type="button">Generate</button>
+      <div class="mt-5 flex items-center gap-3 border-t border-white/10 pt-5">
+        <button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-5 py-3 font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="generateReport" type="button">Generate image</button>
       </div>
-      <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4" id="generatedActions" hidden>
-        <span class="mt-2 text-sm leading-snug text-slate-500" id="reportStatus">Report generated.</span>
-        <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="copyPng" type="button">Copy image</button>
-        <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="downloadPng" type="button">Download image</button>
-      </div>
+      <figure class="mt-5 rounded-2xl border border-white/10 bg-slate-950 p-4" id="reportPreview" hidden>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3" id="generatedActions" hidden>
+          <span class="text-sm font-bold leading-snug text-slate-400" id="reportStatus">Preparing image...</span>
+          <div class="flex flex-wrap items-center gap-3">
+            <a class="rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 no-underline transition hover:-translate-y-px hover:brightness-105" id="openImage" target="_blank" rel="noopener noreferrer">Open image</a>
+            <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="copyPng" type="button">Copy image</button>
+          </div>
+        </div>
+        <img class="mx-auto block h-auto max-w-full rounded-lg" id="reportImage" alt="Generated Wordle standings report">
+      </figure>
     </div>
     <div class="pointer-events-none fixed top-0 left-0 w-max -translate-x-full" id="reportFrame"></div>
   </section>

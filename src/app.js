@@ -15,7 +15,7 @@
  * @typedef {{ sourceDistance: number, dateDistance: number }} NeighborDistance
  * @typedef {{ serverName: string, timeframe: Timeframe, excludedDates: string, rawText: string, aliases: Record<string, string>, flaggedUsers: string[] }} AppState
  * @typedef {{ streak: number, timestampLine: string | null, postedDate: string | null, postedHour: number | null, scores: ScoreMap, resultDate: string | null, eraBase: string | null, sourceIndex: number | null }} DailyResult
- * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportStatus: HTMLElement, generatedActions: HTMLElement, generateReport: HTMLButtonElement, copyPng: HTMLButtonElement, downloadPng: HTMLButtonElement, aliasRoster: HTMLElement }} Elements
+ * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportPreview: HTMLElement, reportImage: HTMLImageElement, reportStatus: HTMLElement, generatedActions: HTMLElement, generateReport: HTMLButtonElement, openImage: HTMLAnchorElement, copyPng: HTMLButtonElement, aliasRoster: HTMLElement }} Elements
  */
 
 const STORE_KEY = 'wordleReport.v1';
@@ -53,7 +53,6 @@ let els = null;
 let state = { ...DEFAULT_STATE, aliases: {}, flaggedUsers: [] };
 /** @type {HTMLElement | null} */
 let lastRenderedReport = null;
-let lastRenderedFileName = 'wordle-report.png';
 /** @type {Blob | null} */
 let lastRenderedBlob = null;
 /** @type {string | null} */
@@ -94,11 +93,13 @@ function getElements() {
     searchTerm: $('searchTerm'),
     notice: $('notice'),
     reportFrame: $('reportFrame'),
+    reportPreview: $('reportPreview'),
+    reportImage: /** @type {HTMLImageElement} */ ($('reportImage')),
     reportStatus: $('reportStatus'),
     generatedActions: $('generatedActions'),
     generateReport: /** @type {HTMLButtonElement} */ ($('generateReport')),
+    openImage: /** @type {HTMLAnchorElement} */ ($('openImage')),
     copyPng: /** @type {HTMLButtonElement} */ ($('copyPng')),
-    downloadPng: /** @type {HTMLButtonElement} */ ($('downloadPng')),
     aliasRoster: $('aliasRoster'),
   };
 }
@@ -127,7 +128,6 @@ function bindEvents() {
   $('clearDataTop').addEventListener('click', clearData);
   $('generateReport').addEventListener('click', renderReport);
   $('copyPng').addEventListener('click', copyPng);
-  $('downloadPng').addEventListener('click', downloadPng);
 }
 
 /** @returns {AppState} */
@@ -645,7 +645,7 @@ export function qualifiedRows(stats, minGames) {
     .sort((a, b) => averageScore(a[1]) - averageScore(b[1]) || b[1].played - a[1].played || a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
 }
 
-function renderReport() {
+async function renderReport() {
   const allResults = parseDailyResults(state.rawText || '');
   const excludedDates = parseExcludedDates(state.excludedDates || '');
   const filtered = filterResults(allResults, state.timeframe || 'all', excludedDates);
@@ -684,59 +684,133 @@ function renderReport() {
   const hardestDayText = hardestDay?.resultDate
     ? `${formatShortDate(hardestDay.resultDate)} (Wordle #${wordleNumber(hardestDay.resultDate)}): ${dailyAverage(hardestDay).toFixed(2)} avg`
     : '-';
-  const crownText = crownLeader ? `${playerNameHtml(crownLeader[0], flaggedUsers)}: ${crownLeader[1].wins} crowns` : '-';
-  const cleanText = cleanest ? `${playerNameHtml(cleanest[0], flaggedUsers)}: ${(solveRate(cleanest[1]) * 100).toFixed(0)}% solved` : '-';
+  const crownName = crownLeader ? playerNameHtml(crownLeader[0], flaggedUsers) : 'No qualifier';
+  const crownCount = crownLeader ? crownLeader[1].wins : 0;
+  const cleanName = cleanest ? playerNameHtml(cleanest[0], flaggedUsers) : 'No qualifier';
+  const cleanRate = cleanest ? (solveRate(cleanest[1]) * 100).toFixed(0) : '0';
 
-  assertEls().reportFrame.innerHTML = `<main class="mx-auto max-w-5xl bg-slate-950 p-12 font-sans text-slate-50" id="shareReport">
+  assertEls().reportFrame.innerHTML = `<main class="mx-auto w-256 bg-gradient-to-br from-slate-950 via-slate-900 to-stone-900 p-10 font-sans text-slate-50" id="shareReport">
     <section class="grid grid-cols-3 items-stretch gap-6">
-      <div class="col-span-2 rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl">
+      <div class="col-span-2 rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl ring-1 ring-white/5">
         <div class="text-sm font-extrabold uppercase tracking-widest text-amber-300">${escapeHtml(community)} Wordle</div>
-        <h1 class="my-2 text-6xl font-bold leading-none tracking-tighter">Wordle Standings</h1>
-        <div class="text-xl text-slate-300">${escapeHtml(period)} · minimum ${minGames} games</div>
+        <h1 class="my-2 text-6xl font-black leading-none tracking-tighter">Wordle Standings</h1>
+        <div class="text-xl font-semibold text-slate-300">${escapeHtml(period)} · minimum ${minGames} games</div>
       </div>
-      <div class="flex flex-col justify-center rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl">
+      <div class="flex min-w-0 flex-col justify-center rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl ring-1 ring-white/5">
         <div class="text-xs font-extrabold uppercase tracking-widest text-slate-300">Winner</div>
-        <div class="mt-3 text-4xl font-black leading-none tracking-tighter text-amber-300">${winnerNames}</div>
-        <div class="mt-4 text-lg text-slate-300">${winnerScore}</div>
+        <div class="mt-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-4xl font-black leading-none tracking-tighter text-amber-300">${winnerNames}</div>
+        <div class="mt-4 text-lg font-semibold text-slate-300">${winnerScore}</div>
       </div>
     </section>
-    <section class="my-6 grid grid-cols-4 gap-4">
-      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-4xl font-black tracking-tighter">${results.length}</div><div class="mt-1 text-xs text-slate-300">counted days</div></div>
-      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-4xl font-black tracking-tighter">${avgPlayers.toFixed(1)}</div><div class="mt-1 text-xs text-slate-300">avg players/day</div></div>
-      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-3xl font-black leading-tight tracking-tighter">${crownText}</div><div class="mt-1 text-xs text-slate-300">most daily crowns</div></div>
-      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-3xl font-black leading-tight tracking-tighter">${cleanText}</div><div class="mt-1 text-xs text-slate-300">cleanest solver</div></div>
+    <section class="my-5 grid grid-cols-6 gap-4">
+      <div class="rounded-3xl border border-white/15 bg-slate-900/80 p-5 shadow-xl ring-1 ring-white/5">
+        <div class="text-5xl font-black tracking-tighter">${results.length}</div>
+        <div class="mt-1 text-xs font-semibold text-slate-300">counted days</div>
+      </div>
+      <div class="rounded-3xl border border-white/15 bg-slate-900/80 p-5 shadow-xl ring-1 ring-white/5">
+        <div class="text-5xl font-black tracking-tighter">${avgPlayers.toFixed(1)}</div>
+        <div class="mt-1 text-xs font-semibold text-slate-300">avg players/day</div>
+      </div>
+      <div class="col-span-2 min-w-0 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl ring-1 ring-white/5">
+        <div class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-black text-amber-200">${crownName}</div>
+        <div class="mt-1 text-4xl font-black leading-none tracking-tighter text-amber-300">${crownCount} crowns</div>
+        <div class="mt-2 text-xs font-semibold text-slate-300">most daily crowns</div>
+      </div>
+      <div class="col-span-2 min-w-0 rounded-3xl border border-green-400/20 bg-green-400/10 p-5 shadow-xl ring-1 ring-white/5">
+        <div class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-black text-green-100">${cleanName}</div>
+        <div class="mt-1 text-4xl font-black leading-none tracking-tighter text-green-100">${cleanRate}% solved</div>
+        <div class="mt-2 text-xs font-semibold text-slate-300">cleanest solver</div>
+      </div>
     </section>
-    <section class="rounded-3xl border border-white/15 bg-white/10 p-5 shadow-2xl">
-      <div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 text-xs font-extrabold uppercase tracking-widest text-slate-300"><div>#</div><div class="col-span-3">Player</div><div>Avg</div><div>Games</div><div>Crowns</div><div>1/6</div><div>2/6</div><div>3/6</div><div>4/6</div><div>5/6</div><div>6/6</div><div>Miss</div></div>
-      ${rowHtml || '<div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 odd:bg-white/10"><div></div><div class="col-span-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-extrabold">No qualified players</div></div>'}
+    <section class="rounded-3xl border border-white/15 bg-slate-900/85 p-4 shadow-2xl ring-1 ring-white/5">
+      <table class="w-full table-auto border-separate border-spacing-y-1 text-left text-sm tabular-nums">
+        <thead class="text-xs font-extrabold uppercase tracking-widest text-slate-300">
+          <tr>
+            <th class="px-3 py-2">#</th>
+            <th class="px-3 py-2">Player</th>
+            <th class="px-2 py-2">Avg</th>
+            <th class="px-2 py-2">Games</th>
+            <th class="px-2 py-2">Crowns</th>
+            <th class="px-2 py-2">1/6</th>
+            <th class="px-2 py-2">2/6</th>
+            <th class="px-2 py-2">3/6</th>
+            <th class="px-2 py-2">4/6</th>
+            <th class="px-2 py-2">5/6</th>
+            <th class="px-2 py-2">6/6</th>
+            <th class="px-2 py-2">Miss</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowHtml || '<tr><td></td><td class="px-3 py-2 font-extrabold">No qualified players</td></tr>'}
+        </tbody>
+      </table>
     </section>
-    <div class="mt-4 text-center text-xs text-slate-300">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
-    <div class="mt-2 text-center text-xs text-slate-300">Excluded dates: ${escapeHtml(excludedText)}</div>
+    <div class="mt-4 text-center text-xs font-semibold text-slate-300">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
+    <div class="mt-2 text-center text-xs font-semibold text-slate-300">Excluded dates: ${escapeHtml(excludedText)}</div>
   </main>`;
   lastRenderedReport = $('shareReport');
-  lastRenderedFileName = fileNameForReport(state.timeframe || 'all');
   reportGenerated = true;
-  lastRenderedBlob = null;
-  if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
-  lastRenderedUrl = null;
+  clearImagePreview();
   updateReportControls();
   refreshStatus();
+  await renderImagePreview();
 }
 
 function markReportStale() {
   reportGenerated = false;
   lastRenderedReport = null;
-  lastRenderedBlob = null;
-  if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
-  lastRenderedUrl = null;
+  clearImagePreview();
   assertEls().reportFrame.innerHTML = '';
   updateReportControls();
 }
 
 function updateReportControls() {
-  assertEls().reportStatus.textContent = reportGenerated ? 'Report generated.' : '';
+  assertEls().reportStatus.textContent = reportGenerated ? 'Preparing image...' : '';
   assertEls().generateReport.hidden = reportGenerated;
-  assertEls().generatedActions.hidden = !reportGenerated;
+}
+
+function clearImagePreview() {
+  lastRenderedBlob = null;
+  if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
+  lastRenderedUrl = null;
+
+  if (!els) return;
+  assertEls().reportPreview.hidden = true;
+  assertEls().generatedActions.hidden = true;
+  assertEls().reportImage.removeAttribute('src');
+  assertEls().openImage.removeAttribute('href');
+}
+
+async function renderImagePreview() {
+  const blob = await reportBlob();
+  if (!blob) {
+    assertEls().reportStatus.textContent = 'Could not prepare image.';
+    return;
+  }
+
+  lastRenderedBlob = blob;
+  if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
+  lastRenderedUrl = URL.createObjectURL(blob);
+
+  assertEls().reportImage.src = lastRenderedUrl;
+  assertEls().openImage.href = lastRenderedUrl;
+  assertEls().reportPreview.hidden = false;
+  assertEls().generatedActions.hidden = false;
+  assertEls().reportStatus.textContent = 'Image ready.';
+}
+
+async function copyPng() {
+  const blob = lastRenderedBlob || (await reportBlob());
+  if (!blob) return;
+
+  lastRenderedBlob = blob;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    assertEls().reportStatus.textContent = 'Image copied.';
+  } catch (error) {
+    assertEls().reportStatus.textContent = 'Image ready.';
+    showNotice(`Clipboard copy was blocked by the browser. (${error instanceof Error ? error.message : String(error)})`);
+  }
 }
 
 /**
@@ -765,54 +839,20 @@ function playerNameHtml(user, flaggedUsers) {
  */
 function playerRow(rank, user, stat, flaggedUsers) {
   const b = stat.buckets;
-  return `<div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 tabular-nums odd:bg-white/10">
-    <div class="font-black text-amber-300">${rank}</div>
-    <div class="col-span-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-extrabold">${playerNameHtml(user, flaggedUsers)}</div>
-    <div>${averageScore(stat).toFixed(3)}</div>
-    <div>${stat.played}</div>
-    <div>${stat.wins}</div>
-    <div class="font-extrabold text-slate-200">${b['1']}</div>
-    <div class="font-extrabold text-slate-200">${b['2']}</div>
-    <div class="font-extrabold text-slate-200">${b['3']}</div>
-    <div class="font-extrabold text-slate-200">${b['4']}</div>
-    <div class="font-extrabold text-slate-200">${b['5']}</div>
-    <div class="font-extrabold text-slate-200">${b['6']}</div>
-    <div class="font-extrabold text-red-300">${b.X}</div>
-  </div>`;
-}
-
-async function copyPng() {
-  assertEls().reportStatus.textContent = 'Preparing image...';
-  const blob = lastRenderedBlob || (await reportBlob());
-  if (!blob) {
-    assertEls().reportStatus.textContent = 'Report generated.';
-    return;
-  }
-  lastRenderedBlob = blob;
-  try {
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    assertEls().reportStatus.textContent = 'Image copied.';
-  } catch (error) {
-    assertEls().reportStatus.textContent = 'Report generated.';
-    showNotice(`Clipboard copy was blocked by the browser. Use Download image instead. (${error instanceof Error ? error.message : String(error)})`);
-  }
-}
-
-async function downloadPng() {
-  assertEls().reportStatus.textContent = 'Preparing image...';
-  const blob = lastRenderedBlob || (await reportBlob());
-  if (!blob) {
-    assertEls().reportStatus.textContent = 'Report generated.';
-    return;
-  }
-  lastRenderedBlob = blob;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = lastRenderedFileName;
-  a.click();
-  URL.revokeObjectURL(url);
-  assertEls().reportStatus.textContent = 'Image downloaded.';
+  return `<tr class="odd:bg-white/10">
+    <td class="rounded-l-2xl px-3 py-2 font-black text-amber-300">${rank}</td>
+    <td class="max-w-60 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2 font-extrabold">${playerNameHtml(user, flaggedUsers)}</td>
+    <td class="px-2 py-2">${averageScore(stat).toFixed(3)}</td>
+    <td class="px-2 py-2">${stat.played}</td>
+    <td class="px-2 py-2">${stat.wins}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['1']}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['2']}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['3']}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['4']}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['5']}</td>
+    <td class="px-2 py-2 font-extrabold text-slate-200">${b['6']}</td>
+    <td class="rounded-r-2xl px-2 py-2 font-extrabold text-red-300">${b.X}</td>
+  </tr>`;
 }
 
 /** @returns {Promise<Blob | null>} */
@@ -834,7 +874,7 @@ async function renderNodeToCanvas(node) {
   const width = Math.ceil(node.offsetWidth);
   const height = Math.ceil(node.offsetHeight);
   const style = collectPageStyles();
-  const xhtml = `<div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${node.outerHTML}</div>`;
+  const xhtml = `<div xmlns="http://www.w3.org/1999/xhtml"><style><![CDATA[${style.replaceAll(']]>', ']]]]><![CDATA[>')}]]></style>${node.outerHTML}</div>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
   // Chromium taints the canvas when an <img> loads an SVG-foreignObject from a blob: URL
   // even on same origin, so we serialize to a data: URL which renders without tainting.
@@ -959,10 +999,10 @@ function renderAliasRoster() {
         )
         .join('');
       const flagged = flaggedUsers.has(primary);
-      return `<div class="grid grid-cols-1 items-center gap-4 px-4 py-2 hover:bg-white/5 md:grid-cols-6">
-      <div class="break-words text-sm font-bold text-slate-50">${escapeHtml(primary)}</div>
-      <div class="flex flex-wrap items-center gap-2 md:col-span-4">${chipsHtml}<span><input class="w-auto min-w-40 rounded-full border border-dashed border-white/20 bg-transparent px-3 py-1 text-xs text-slate-300 outline-none focus:border-solid focus:border-sky-300 focus:text-slate-50 focus:ring-4 focus:ring-sky-300/10" type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
-      <button type="button" class="inline-flex w-auto cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-extrabold ${flagged ? 'border-red-400/40 bg-red-400/15 text-red-100' : 'border-white/10 bg-white/10 text-slate-300'} hover:bg-white/15 hover:text-slate-50" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" title="History of Unsportsmanlike-Conduct">🚩 ${flagged ? 'Flagged' : 'Flag'}</button>
+      return `<div class="grid grid-cols-1 items-center gap-4 px-4 py-2 hover:bg-white/5 md:grid-cols-12">
+      <div class="break-words text-sm font-bold text-slate-50 md:col-span-2">${escapeHtml(primary)}</div>
+      <div class="flex flex-wrap items-center gap-2 md:col-span-9">${chipsHtml}<span><input class="w-auto min-w-40 rounded-full border border-dashed border-white/20 bg-transparent px-3 py-1 text-xs text-slate-300 outline-none focus:border-solid focus:border-sky-300 focus:text-slate-50 focus:ring-4 focus:ring-sky-300/10" type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
+      <button type="button" class="ml-auto grid size-9 cursor-pointer place-items-center rounded-full border text-base transition ${flagged ? 'border-red-400/50 bg-red-400/15 text-red-300 shadow-sm' : 'border-transparent bg-transparent text-slate-600 hover:border-white/10 hover:bg-white/10 hover:text-slate-300'}" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" aria-label="${flagged ? 'Remove conduct flag from' : 'Add conduct flag to'} ${escapeHtml(primary)}" title="History of Unsportsmanlike-Conduct">⚑</button>
     </div>`;
     })
     .join('');
@@ -1180,16 +1220,6 @@ function formatShortDate(iso) {
 function escapeHtml(value) {
   const entities = /** @type {Record<string, string>} */ ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' });
   return String(value).replace(/[&<>'"]/g, (ch) => entities[ch] || ch);
-}
-
-/** @param {Timeframe} timeframe */
-function fileNameForReport(timeframe) {
-  const prefix =
-    (state.serverName || 'wordle')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'wordle';
-  return `${prefix}-${timeframe}-wordle.png`;
 }
 
 /** @param {string} value */
