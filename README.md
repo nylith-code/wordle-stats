@@ -2,11 +2,9 @@
 
 A static HTML app for turning copied Discord Wordle bot results into a shareable standings image.
 
-If you do not want to run it locally, use the official published version at <https://wordle.nylith.com/>.
-
 ## Usage
 
-Use the published version, or run a local static server and open it in a browser. The app uses a native JavaScript module, so opening `index.html` directly with `file://` is not reliable.
+Use the published version at <https://wordle.nylith.com/>, or run it locally on your own machine with [Bun](https://bun.com/):
 
 ```sh
 bun run serve
@@ -18,30 +16,15 @@ The app stores pasted bot data and settings in your local browser storage. No da
 
 ## Development
 
-Install dependencies with Bun:
-
 ```sh
 bun install
-```
+bun run build # build for deployment
+bun run serve # serve the files locally
 
-Useful commands:
-
-```sh
+# dev/test scripts that must be run before all commits
 bun run test
 bun run typecheck
 bun run lint
 bun run format
 bun run check
 ```
-
-The app intentionally uses one native browser module at [`src/app.js`](src/app.js). Pure parsing and stats helpers are exported from that module so tests can import them directly.
-
-## Release Version
-
-There is no build step. For a release, manually keep these version values in sync:
-
-- `APP_VERSION` in [`src/app.js`](src/app.js)
-- The cache-busting query string on the module script in [`index.html`](index.html)
-- The package version in [`package.json`](package.json)
-
-The footer version is populated from `APP_VERSION` when the module loads.

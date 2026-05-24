@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordle Report Builder</title>
+<link rel="canonical" href="https://wordle.nylith.com/">
+<link rel="stylesheet" href="./assets/app.css?v=__APP_VERSION__">
+</head>
+<body class="min-h-screen bg-slate-950 font-sans text-slate-50">
+<main class="mx-auto max-w-5xl px-4 py-8 sm:py-10">
+  <header class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row">
+    <div>
+      <h1 class="m-0 text-4xl font-bold leading-none tracking-tighter sm:text-6xl">Wordle Stats Generator</h1>
+    </div>
+    <div class="flex flex-wrap items-center gap-3 md:justify-end">
+      <a class="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-black text-slate-50 no-underline transition hover:-translate-y-px hover:bg-white/15" href="https://github.com/nylith-code/wordle-stats" target="_blank" rel="noopener noreferrer" aria-label="Open the Wordle Stats GitHub repository">
+        <svg class="size-4 fill-current" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+      <button class="cursor-pointer rounded-lg border border-red-400/25 bg-transparent px-4 py-2 font-black text-red-300 transition hover:-translate-y-px hover:brightness-105" id="clearDataTop" type="button">Clear data</button>
+    </div>
+  </header>
+
+  <section class="grid gap-4">
+    <div class="rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-5 flex items-center gap-4">
+        <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-300 font-black text-slate-950">1</div>
+        <h2 class="m-0 text-2xl font-bold tracking-tight">Search Discord for the next batch</h2>
+      </div>
+      <p class="mb-4 leading-normal text-slate-300" id="channelInstruction">Open each Discord channel where this community has played Wordle. Press <strong>Ctrl+F</strong> in a channel so Discord starts a channel-limited search, then append this search text.</p>
+      <div class="mt-4 grid gap-3">
+        <div class="flex items-center gap-3 rounded-lg border border-white/15 bg-slate-950 px-4 py-3"><code class="flex-1 break-words text-sky-100" id="searchTerm">"Your group is on"</code><button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-3 py-2 text-xs font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="copySearch" type="button">Copy</button></div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-5 flex items-center gap-4">
+        <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-300 font-black text-slate-950">2</div>
+        <h2 class="m-0 text-2xl font-bold tracking-tight">Copy and paste search results</h2>
+      </div>
+      <div class="grid items-start gap-4 md:grid-cols-5">
+        <label class="grid self-stretch gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300 md:col-span-3">Paste Discord search results
+          <textarea class="h-96 min-h-96 w-full resize-y rounded-lg border border-amber-300/40 bg-slate-950 px-4 py-3 font-mono text-sm leading-snug text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="pasteBox" placeholder="Paste copied Discord search results here..."></textarea>
+        </label>
+        <label class="grid self-stretch gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300 opacity-70 md:col-span-2">Example of data to paste
+          <pre class="m-0 h-96 min-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-slate-950 p-4 font-mono text-xs leading-snug text-slate-400">Wordle
+APP
+ — 5/6/26, 4:52 PM
+Your group is on a 74 day streak! 🔥 Here are yesterday's results:
+👑 3/6: @PlayerOne @PlayerTwo
+4/6: @PlayerThree @PlayerFour @PlayerFive
+5/6: @PlayerSix @PlayerSeven
+X/6: @PlayerEight
+7 solved and 1 unsolved games of Wordle
+
+Wordle
+APP
+ — 5/5/26, 4:35 PM
+Your group is on a 73 day streak! 🔥 Here are yesterday's results:
+👑 2/6: @PlayerTwo
+3/6: @PlayerFive
+4/6: @PlayerOne @PlayerSix
+6/6: @PlayerFour
+4 solved games of Wordle</pre>
+        </label>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-4 py-2 font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="appendData" type="button">Add pasted data</button>
+      </div>
+      <div class="hidden" id="notice"></div>
+    </div>
+
+    <div class="rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-5 flex items-center gap-4">
+        <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-300 font-black text-slate-950">3</div>
+        <h2 class="m-0 text-2xl font-bold tracking-tight">Merge player aliases</h2>
+      </div>
+      <p class="mb-4 leading-normal text-slate-300">Merge usernames to handle players who changed their Discord name, or flag players with a history of Unsportsmanlike-Conduct.</p>
+      <div id="aliasRoster"></div>
+    </div>
+  </section>
+
+  <section class="mt-5 grid gap-5">
+    <div class="rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-5 flex items-center gap-4">
+        <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-300 font-black text-slate-950">4</div>
+        <h2 class="m-0 text-2xl font-bold tracking-tight">Generate image</h2>
+      </div>
+      <div class="grid items-end gap-4 md:grid-cols-3">
+        <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300">Server or group name
+          <input class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="serverName" value="My Discord" autocomplete="off">
+        </label>
+        <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300">Report timeframe
+          <select class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="timeframe">
+            <option value="all">All stored games</option>
+            <option value="current">Current month</option>
+            <option value="last">Last month</option>
+          </select>
+        </label>
+        <label class="grid gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-300">Excluded dates
+          <input class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="excludedDates" placeholder="YYYY-MM-DD, YYYY-MM-DD">
+        </label>
+      </div>
+      <div class="mt-4 flex items-center gap-3 border-t border-white/10 pt-4">
+        <button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-4 py-2 font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="generateReport" type="button">Generate</button>
+      </div>
+      <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4" id="generatedActions" hidden>
+        <span class="mt-2 text-sm leading-snug text-slate-500" id="reportStatus">Report generated.</span>
+        <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="copyPng" type="button">Copy image</button>
+        <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="downloadPng" type="button">Download image</button>
+      </div>
+    </div>
+    <div class="pointer-events-none fixed top-0 left-0 w-max -translate-x-full" id="reportFrame"></div>
+  </section>
+  <footer class="mt-7 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-white/10 pt-6 text-xs tracking-wide text-slate-500 opacity-80">
+    <span>v__APP_VERSION__</span>
+    <span>Created by Nylith</span>
+  </footer>
+</main>
+
+<script type="module" src="./src/app.js?v=__APP_VERSION__"></script>
+</body>
+</html>

@@ -15,11 +15,8 @@
  * @typedef {{ sourceDistance: number, dateDistance: number }} NeighborDistance
  * @typedef {{ serverName: string, timeframe: Timeframe, excludedDates: string, rawText: string, aliases: Record<string, string>, flaggedUsers: string[] }} AppState
  * @typedef {{ streak: number, timestampLine: string | null, postedDate: string | null, postedHour: number | null, scores: ScoreMap, resultDate: string | null, eraBase: string | null, sourceIndex: number | null }} DailyResult
- * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportStatus: HTMLElement, generatedActions: HTMLElement, generateReport: HTMLButtonElement, copyPng: HTMLButtonElement, downloadPng: HTMLButtonElement, aliasRoster: HTMLElement, appVersion: HTMLElement }} Elements
+ * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportStatus: HTMLElement, generatedActions: HTMLElement, generateReport: HTMLButtonElement, copyPng: HTMLButtonElement, downloadPng: HTMLButtonElement, aliasRoster: HTMLElement }} Elements
  */
-
-// Release: keep APP_VERSION in sync with the index.html module query string.
-export const APP_VERSION = '1.7.0';
 
 const STORE_KEY = 'wordleReport.v1';
 /** @type {ScoreBucket[]} */
@@ -62,6 +59,8 @@ let lastRenderedBlob = null;
 /** @type {string | null} */
 let lastRenderedUrl = null;
 let reportGenerated = false;
+/** @type {string | null} */
+let serializedCss = null;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let noticeTimer;
 
@@ -70,7 +69,6 @@ if (typeof document !== 'undefined') init();
 function init() {
   els = getElements();
   state = loadState();
-  setVersionText();
   bindEvents();
   bindAliasEvents();
   syncInputsFromState();
@@ -102,12 +100,7 @@ function getElements() {
     copyPng: /** @type {HTMLButtonElement} */ ($('copyPng')),
     downloadPng: /** @type {HTMLButtonElement} */ ($('downloadPng')),
     aliasRoster: $('aliasRoster'),
-    appVersion: $('appVersion'),
   };
-}
-
-function setVersionText() {
-  assertEls().appVersion.textContent = `v${APP_VERSION}`;
 }
 
 function assertEls() {
@@ -694,31 +687,31 @@ function renderReport() {
   const crownText = crownLeader ? `${playerNameHtml(crownLeader[0], flaggedUsers)}: ${crownLeader[1].wins} crowns` : '-';
   const cleanText = cleanest ? `${playerNameHtml(cleanest[0], flaggedUsers)}: ${(solveRate(cleanest[1]) * 100).toFixed(0)}% solved` : '-';
 
-  assertEls().reportFrame.innerHTML = `<main class="wordle-report" id="shareReport">
-    <section class="hero">
-      <div class="panel headline">
-        <div class="eyebrow">${escapeHtml(community)} Wordle</div>
-        <h1>Wordle Standings</h1>
-        <div class="sub">${escapeHtml(period)} · minimum ${minGames} games</div>
+  assertEls().reportFrame.innerHTML = `<main class="mx-auto max-w-5xl bg-slate-950 p-12 font-sans text-slate-50" id="shareReport">
+    <section class="grid grid-cols-3 items-stretch gap-6">
+      <div class="col-span-2 rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl">
+        <div class="text-sm font-extrabold uppercase tracking-widest text-amber-300">${escapeHtml(community)} Wordle</div>
+        <h1 class="my-2 text-6xl font-bold leading-none tracking-tighter">Wordle Standings</h1>
+        <div class="text-xl text-slate-300">${escapeHtml(period)} · minimum ${minGames} games</div>
       </div>
-      <div class="panel winner">
-        <div class="label">Winner</div>
-        <div class="name">${winnerNames}</div>
-        <div class="score">${winnerScore}</div>
+      <div class="flex flex-col justify-center rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl">
+        <div class="text-xs font-extrabold uppercase tracking-widest text-slate-300">Winner</div>
+        <div class="mt-3 text-4xl font-black leading-none tracking-tighter text-amber-300">${winnerNames}</div>
+        <div class="mt-4 text-lg text-slate-300">${winnerScore}</div>
       </div>
     </section>
-    <section class="stats">
-      <div class="stat"><div class="num">${results.length}</div><div class="cap">counted days</div></div>
-      <div class="stat"><div class="num">${avgPlayers.toFixed(1)}</div><div class="cap">avg players/day</div></div>
-      <div class="stat"><div class="num tight">${crownText}</div><div class="cap">most daily crowns</div></div>
-      <div class="stat"><div class="num tight">${cleanText}</div><div class="cap">cleanest solver</div></div>
+    <section class="my-6 grid grid-cols-4 gap-4">
+      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-4xl font-black tracking-tighter">${results.length}</div><div class="mt-1 text-xs text-slate-300">counted days</div></div>
+      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-4xl font-black tracking-tighter">${avgPlayers.toFixed(1)}</div><div class="mt-1 text-xs text-slate-300">avg players/day</div></div>
+      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-3xl font-black leading-tight tracking-tighter">${crownText}</div><div class="mt-1 text-xs text-slate-300">most daily crowns</div></div>
+      <div class="rounded-3xl border border-white/15 bg-white/10 p-6"><div class="text-3xl font-black leading-tight tracking-tighter">${cleanText}</div><div class="mt-1 text-xs text-slate-300">cleanest solver</div></div>
     </section>
-    <section class="panel board">
-      <div class="row head"><div>#</div><div>Player</div><div>Avg</div><div>Games</div><div>Crowns</div><div>1/6</div><div>2/6</div><div>3/6</div><div>4/6</div><div>5/6</div><div>6/6</div><div>Miss</div></div>
-      ${rowHtml || '<div class="row"><div></div><div class="user">No qualified players</div></div>'}
+    <section class="rounded-3xl border border-white/15 bg-white/10 p-5 shadow-2xl">
+      <div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 text-xs font-extrabold uppercase tracking-widest text-slate-300"><div>#</div><div class="col-span-3">Player</div><div>Avg</div><div>Games</div><div>Crowns</div><div>1/6</div><div>2/6</div><div>3/6</div><div>4/6</div><div>5/6</div><div>6/6</div><div>Miss</div></div>
+      ${rowHtml || '<div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 odd:bg-white/10"><div></div><div class="col-span-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-extrabold">No qualified players</div></div>'}
     </section>
-    <div class="footer">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
-    <div class="footer">Excluded dates: ${escapeHtml(excludedText)}</div>
+    <div class="mt-4 text-center text-xs text-slate-300">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
+    <div class="mt-2 text-center text-xs text-slate-300">Excluded dates: ${escapeHtml(excludedText)}</div>
   </main>`;
   lastRenderedReport = $('shareReport');
   lastRenderedFileName = fileNameForReport(state.timeframe || 'all');
@@ -761,7 +754,7 @@ function flaggedUserSet(aliases) {
 function playerNameHtml(user, flaggedUsers) {
   if (!flaggedUsers.has(user)) return escapeHtml(user);
   const tooltip = 'History of Unsportsmanlike-Conduct';
-  return `<span class="flagged-name"><span class="flag" title="${tooltip}" aria-label="${tooltip}">🚩</span><span class="player-label">${escapeHtml(user)}</span></span>`;
+  return `<span class="inline-flex min-w-0 max-w-full items-baseline gap-2"><span class="shrink-0 text-sm" title="${tooltip}" aria-label="${tooltip}">🚩</span><span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">${escapeHtml(user)}</span></span>`;
 }
 
 /**
@@ -772,19 +765,19 @@ function playerNameHtml(user, flaggedUsers) {
  */
 function playerRow(rank, user, stat, flaggedUsers) {
   const b = stat.buckets;
-  return `<div class="row">
-    <div class="rank">${rank}</div>
-    <div class="user">${playerNameHtml(user, flaggedUsers)}</div>
-    <div class="metric">${averageScore(stat).toFixed(3)}</div>
-    <div class="metric">${stat.played}</div>
-    <div class="metric">${stat.wins}</div>
-    <div class="metric score-count">${b['1']}</div>
-    <div class="metric score-count">${b['2']}</div>
-    <div class="metric score-count">${b['3']}</div>
-    <div class="metric score-count">${b['4']}</div>
-    <div class="metric score-count">${b['5']}</div>
-    <div class="metric score-count">${b['6']}</div>
-    <div class="metric miss">${b.X}</div>
+  return `<div class="grid grid-cols-12 items-center gap-3 rounded-2xl px-4 py-3 tabular-nums odd:bg-white/10">
+    <div class="font-black text-amber-300">${rank}</div>
+    <div class="col-span-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-extrabold">${playerNameHtml(user, flaggedUsers)}</div>
+    <div>${averageScore(stat).toFixed(3)}</div>
+    <div>${stat.played}</div>
+    <div>${stat.wins}</div>
+    <div class="font-extrabold text-slate-200">${b['1']}</div>
+    <div class="font-extrabold text-slate-200">${b['2']}</div>
+    <div class="font-extrabold text-slate-200">${b['3']}</div>
+    <div class="font-extrabold text-slate-200">${b['4']}</div>
+    <div class="font-extrabold text-slate-200">${b['5']}</div>
+    <div class="font-extrabold text-slate-200">${b['6']}</div>
+    <div class="font-extrabold text-red-300">${b.X}</div>
   </div>`;
 }
 
@@ -840,7 +833,7 @@ async function renderNodeToCanvas(node) {
   const scale = 2;
   const width = Math.ceil(node.offsetWidth);
   const height = Math.ceil(node.offsetHeight);
-  const style = $('report-style').textContent;
+  const style = collectPageStyles();
   const xhtml = `<div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${node.outerHTML}</div>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
   // Chromium taints the canvas when an <img> loads an SVG-foreignObject from a blob: URL
@@ -862,6 +855,20 @@ async function renderNodeToCanvas(node) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+
+function collectPageStyles() {
+  if (serializedCss) return serializedCss;
+  serializedCss = [...document.styleSheets]
+    .flatMap((sheet) => {
+      try {
+        return [...sheet.cssRules].map((rule) => rule.cssText);
+      } catch {
+        return [];
+      }
+    })
+    .join('\n');
+  return serializedCss;
 }
 
 /**
@@ -917,7 +924,8 @@ function renderAliasRoster() {
   for (const p of Object.values(aliases)) primaries.add(p);
 
   if (!primaries.size) {
-    assertEls().aliasRoster.innerHTML = '<div class="alias-empty">Player names will appear here once you add Discord data above.</div>';
+    assertEls().aliasRoster.innerHTML =
+      '<div class="mt-5 rounded-lg border border-dashed border-white/10 p-4 text-center text-sm text-slate-300">Player names will appear here once you add Discord data above.</div>';
     return;
   }
 
@@ -947,19 +955,19 @@ function renderAliasRoster() {
       const chipsHtml = groupAliases
         .map(
           (a) =>
-            `<span class="alias-chip"><span>${escapeHtml(a)}</span><button type="button" data-remove-alias="${escapeHtml(a)}" aria-label="Remove ${escapeHtml(a)}">×</button></span>`,
+            `<span class="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-sky-300/10 py-1 pr-2 pl-3 text-xs font-bold text-sky-100"><span>${escapeHtml(a)}</span><button class="cursor-pointer border-0 bg-transparent px-1 text-sm leading-none text-inherit opacity-70 hover:opacity-100" type="button" data-remove-alias="${escapeHtml(a)}" aria-label="Remove ${escapeHtml(a)}">×</button></span>`,
         )
         .join('');
       const flagged = flaggedUsers.has(primary);
-      return `<div class="alias-row">
-      <div class="alias-primary">${escapeHtml(primary)}</div>
-      <div class="alias-chips">${chipsHtml}<span class="alias-add"><input type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
-      <button type="button" class="flag-toggle${flagged ? ' active' : ''}" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" title="History of Unsportsmanlike-Conduct">🚩 ${flagged ? 'Flagged' : 'Flag'}</button>
+      return `<div class="grid grid-cols-1 items-center gap-4 px-4 py-2 hover:bg-white/5 md:grid-cols-6">
+      <div class="break-words text-sm font-bold text-slate-50">${escapeHtml(primary)}</div>
+      <div class="flex flex-wrap items-center gap-2 md:col-span-4">${chipsHtml}<span><input class="w-auto min-w-40 rounded-full border border-dashed border-white/20 bg-transparent px-3 py-1 text-xs text-slate-300 outline-none focus:border-solid focus:border-sky-300 focus:text-slate-50 focus:ring-4 focus:ring-sky-300/10" type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
+      <button type="button" class="inline-flex w-auto cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-extrabold ${flagged ? 'border-red-400/40 bg-red-400/15 text-red-100' : 'border-white/10 bg-white/10 text-slate-300'} hover:bg-white/15 hover:text-slate-50" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" title="History of Unsportsmanlike-Conduct">🚩 ${flagged ? 'Flagged' : 'Flag'}</button>
     </div>`;
     })
     .join('');
 
-  assertEls().aliasRoster.innerHTML = `<datalist id="aliasDatalist">${datalistHtml}</datalist><div class="alias-roster-list">${rowsHtml}</div>`;
+  assertEls().aliasRoster.innerHTML = `<datalist id="aliasDatalist">${datalistHtml}</datalist><div class="mt-5 grid overflow-hidden rounded-lg border border-white/10">${rowsHtml}</div>`;
 }
 
 /**
@@ -1199,10 +1207,12 @@ async function copyText(value) {
  * @param {'success'} [variant]
  */
 function showNotice(message, variant) {
-  assertEls().notice.textContent = message;
-  assertEls().notice.classList.remove('success');
-  if (variant) assertEls().notice.classList.add(variant);
-  assertEls().notice.classList.add('show');
+  assertEls().notice.textContent = variant ? `✓ ${message}` : message;
+  assertEls().notice.className = variant
+    ? 'mt-4 rounded-lg border border-green-400/40 bg-green-400/15 px-4 py-3 text-sm font-bold leading-snug text-green-100'
+    : 'mt-4 rounded-lg border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm leading-snug text-sky-100';
   clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => assertEls().notice.classList.remove('show'), 5200);
+  noticeTimer = setTimeout(() => {
+    assertEls().notice.className = 'hidden';
+  }, 5200);
 }
