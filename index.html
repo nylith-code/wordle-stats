@@ -217,7 +217,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(141,216,255,.72);
         <div class="step-num">1</div>
         <h2>Search Discord for the next batch</h2>
       </div>
-      <p class="step-desc" id="channelInstruction">Open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> in that channel so Discord starts a channel-limited search, then append this search text.</p>
+      <p class="step-desc" id="channelInstruction">Open each Discord channel where this community has played Wordle. Press <strong>Ctrl+F</strong> in a channel so Discord starts a channel-limited search, then append this search text.</p>
       <div class="query-box">
         <div class="query-line"><code id="searchTerm">"Your group is on"</code><button class="copy-small" id="copySearch">Copy</button></div>
       </div>
@@ -303,7 +303,7 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     <div id="reportFrame"></div>
   </section>
   <footer class="app-footer">
-    <span>v1.5</span>
+    <span>v1.6</span>
     <span>Created by Nylith</span>
   </footer>
 </main>
@@ -315,6 +315,14 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
   const STORE_KEY = 'wordleReport.v1';
   const SCORE_ORDER = ['1', '2', '3', '4', '5', '6', 'X'];
   const SCORE_VALUE = { '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, X: 7 };
+  const RESULT_DATE_CANDIDATES = [
+    { offset: -1, weight: 1 },
+    { offset: -2, weight: 0.45 },
+    { offset: 0, weight: 0.15 }
+  ];
+  const MIN_ERA_SUPPORT = 3;
+  const MIN_ERA_SCORE = 3;
+  const MAX_POSTED_DATE_DISTANCE = 4;
   // Anchor for the official NYT Wordle number, in puzzle-date form. Two known
   // bot messages cross-check this: 2026-05-08 message → "Wordle No 1784" (about
   // puzzle 2026-05-07), and 2026-04-04 message → "1750" (about puzzle 2026-04-03).
@@ -436,13 +444,13 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
     const latest = dated.at(-1) || null;
     const search = latest ? `after: ${latest} "Your group is on"` : '"Your group is on"';
     els.channelInstruction.innerHTML = latest
-      ? `You last generated stats from <strong>${formatDate(latest)}</strong> using <strong>${results.length}</strong> days of stored data. To update the stats, open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> there so Discord starts a channel-limited search, then append this search text.`
-      : 'Open the Discord channel where Wordle is played. Press <strong>Ctrl+F</strong> there so Discord starts a channel-limited search, then append this search text.';
+      ? `You last generated stats from <strong>${formatDate(latest)}</strong> using <strong>${results.length}</strong> days of stored data. To update the stats, search each Discord channel where this community has played Wordle. Press <strong>Ctrl+F</strong> in a channel so Discord starts a channel-limited search, then append this search text.`
+      : 'Open each Discord channel where this community has played Wordle. Press <strong>Ctrl+F</strong> in a channel so Discord starts a channel-limited search, then append this search text.';
     els.searchTerm.textContent = search;
   }
 
   function parseDailyResults(text) {
-    const lines = text.split(/\r?\n/);
+    const lines = normalizeRawText(text).split(/\r?\n/);
     const results = [];
     let sawWordle = false;
     let sawApp = false;
@@ -480,7 +488,7 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
           const streakMatch = line.match(/Your group is on (?:a|an) (\d+) day streak/);
           if (streakMatch) {
             results.push(current);
-            current = { streak: Number(streakMatch[1]), timestampLine, scores: {}, resultDate: null };
+            current = newResult(streakMatch[1], timestampLine);
             continue;
           }
         }
@@ -504,11 +512,29 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
       }
       if (line.startsWith('Your group is on')) {
         const streakMatch = line.match(/Your group is on (?:a|an) (\d+) day streak/);
-        if (streakMatch) current = { streak: Number(streakMatch[1]), timestampLine, scores: {}, resultDate: null };
+        if (streakMatch) current = newResult(streakMatch[1], timestampLine);
       }
     }
 
-    return inferResultDates(dedupeResults(results));
+    results.forEach((result, index) => result.sourceIndex = index);
+    return dedupeResults(inferResultDates(results));
+  }
+
+  function normalizeRawText(text) {
+    return String(text || '').replace(/\\r\\n|\\n/g, '\n');
+  }
+
+  function newResult(streak, timestampLine) {
+    return {
+      streak: Number(streak),
+      timestampLine,
+      postedDate: parseTimestampDate(timestampLine),
+      postedHour: parseTimestampHour(timestampLine),
+      scores: {},
+      resultDate: null,
+      eraBase: null,
+      sourceIndex: null
+    };
   }
 
   function parseMentions(blob) {
@@ -523,48 +549,154 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
   }
 
   function dedupeResults(results) {
+    const byDate = new Map();
+    const undated = [];
+    for (const result of results) {
+      if (!result.resultDate) {
+        undated.push(result);
+        continue;
+      }
+      const existing = byDate.get(result.resultDate);
+      byDate.set(result.resultDate, existing ? mergeResults(existing, result) : result);
+    }
+    return [...byDate.values(), ...dedupeUndatedResults(undated)].sort(compareResults);
+  }
+
+  function mergeResults(a, b) {
+    const scores = { ...a.scores };
+    for (const [user, score] of Object.entries(b.scores)) {
+      const existing = scores[user];
+      if (!existing || SCORE_VALUE[score] < SCORE_VALUE[existing]) scores[user] = score;
+    }
+    return Object.keys(b.scores).length > Object.keys(a.scores).length
+      ? { ...b, scores }
+      : { ...a, scores };
+  }
+
+  function dedupeUndatedResults(results) {
     const byStreak = new Map();
     for (const result of results) {
       const existing = byStreak.get(result.streak);
       if (!existing || Object.keys(result.scores).length > Object.keys(existing.scores).length) byStreak.set(result.streak, result);
     }
-    return [...byStreak.values()].sort((a, b) => a.streak - b.streak);
+    return [...byStreak.values()];
+  }
+
+  function compareResults(a, b) {
+    if (a.resultDate && b.resultDate) return a.resultDate.localeCompare(b.resultDate);
+    if (a.resultDate) return -1;
+    if (b.resultDate) return 1;
+    return a.streak - b.streak;
   }
 
   function inferResultDates(results) {
-    // Each message votes for a baseDate via streak math: baseDate = postedDate - streak.
-    // Bot posts "yesterday's results", so puzzle = postedDate - 1, and streak math
-    // gives every streak a unique date relative to the same baseDate.
-    //
-    // Discord renders timestamps in the user's local timezone, but the bot's tz may
-    // differ. Posts near midnight in user-local time are most likely to be tz-edge
-    // shifted (e.g. a bot post at 11:30 PM bot-tz can land just past midnight in
-    // user-tz, voting for baseDate+1). We prefer "safe-hour" votes (4 AM – 10 PM)
-    // and only fall back to all votes when there are none.
-    const safeCounts = new Map();
-    const allCounts = new Map();
-    for (const result of results) {
-      const postedDate = parseTimestampDate(result.timestampLine);
-      if (!postedDate) continue;
-      const base = addDays(postedDate, -result.streak);
-      allCounts.set(base, (allCounts.get(base) || 0) + 1);
-      const hour = parseTimestampHour(result.timestampLine);
-      if (hour === null || (hour >= 4 && hour <= 22)) {
-        safeCounts.set(base, (safeCounts.get(base) || 0) + 1);
-      }
-    }
-    const counts = safeCounts.size ? safeCounts : allCounts;
-    let baseDate = null;
-    let bestCount = -1;
-    for (const [candidate, count] of counts) {
-      if (count > bestCount) {
-        baseDate = candidate;
-        bestCount = count;
-      }
-    }
-    if (!baseDate) return results;
-    for (const result of results) result.resultDate = addDays(baseDate, result.streak - 1);
+    const selectedBases = selectEraBases(results);
+    if (!selectedBases.length) return results;
+    for (const result of results) if (result.postedDate) assignResultDate(result, selectedBases, results);
+    for (const result of results) if (!result.resultDate) assignResultDate(result, selectedBases, results);
     return results;
+  }
+
+  function selectEraBases(results) {
+    const candidates = new Map();
+    for (const result of results) {
+      if (!result.postedDate) continue;
+      for (const candidate of RESULT_DATE_CANDIDATES) {
+        const resultDate = addDays(result.postedDate, candidate.offset);
+        const base = addDays(resultDate, -result.streak + 1);
+        const record = candidates.get(base) || { base, links: [] };
+        record.links.push({ result, resultDate, weight: candidateWeight(result, candidate) });
+        candidates.set(base, record);
+      }
+    }
+
+    const selected = [];
+    const covered = new Set();
+    while (true) {
+      let best = null;
+      for (const candidate of candidates.values()) {
+        const fresh = candidate.links.filter((link) => !covered.has(link.result));
+        const support = new Set(fresh.map((link) => link.result)).size;
+        const score = fresh.reduce((sum, link) => sum + link.weight, 0);
+        if (support < MIN_ERA_SUPPORT || score < MIN_ERA_SCORE) continue;
+        if (!best || score > best.score || (score === best.score && support > best.support)) {
+          best = { base: candidate.base, score, support, links: fresh };
+        }
+      }
+      if (!best) break;
+      selected.push(best.base);
+      for (const link of best.links) covered.add(link.result);
+    }
+
+    while (selected.length) {
+      const unresolved = new Set(results.filter((result) => result.postedDate && !fitsEraBases(result, selected)));
+      if (!unresolved.size) return selected;
+      const fallback = bestFallbackEra(candidates, unresolved);
+      if (!fallback) return selected;
+      selected.push(fallback);
+    }
+
+    if (!candidates.size) return selected;
+
+    const unresolved = new Set(results.filter((result) => result.postedDate));
+    const fallback = bestFallbackEra(candidates, unresolved);
+    return fallback ? [fallback] : selected;
+  }
+
+  function bestFallbackEra(candidates, unresolved) {
+    let fallback = null;
+    for (const candidate of candidates.values()) {
+      const fresh = candidate.links.filter((link) => unresolved.has(link.result));
+      if (!fresh.length) continue;
+      const support = new Set(fresh.map((link) => link.result)).size;
+      const score = fresh.reduce((sum, link) => sum + link.weight, 0);
+      if (!fallback || score > fallback.score || (score === fallback.score && support > fallback.support)) fallback = { base: candidate.base, score, support };
+    }
+    return fallback?.base || null;
+  }
+
+  function fitsEraBases(result, eraBases) {
+    for (const base of eraBases) {
+      const resultDate = addDays(base, result.streak - 1);
+      if (Math.abs(dateDiff(resultDate, result.postedDate)) <= MAX_POSTED_DATE_DISTANCE) return true;
+    }
+    return false;
+  }
+
+  function candidateWeight(result, candidate) {
+    let weight = candidate.weight;
+    if (candidate.offset === 0 && result.postedHour !== null && result.postedHour >= 4 && result.postedHour <= 22) weight *= 0.5;
+    return weight;
+  }
+
+  function assignResultDate(result, eraBases, allResults) {
+    let best = null;
+    for (const base of eraBases) {
+      const resultDate = addDays(base, result.streak - 1);
+      const distance = result.postedDate ? Math.abs(dateDiff(resultDate, result.postedDate)) : nearestNeighborDateDistance(resultDate, result, allResults);
+      if (result.postedDate && distance > MAX_POSTED_DATE_DISTANCE) continue;
+      const score = result.postedDate ? MAX_POSTED_DATE_DISTANCE - distance : -distance;
+      if (!best || score > best.score) best = { base, resultDate, score };
+    }
+    if (!best) return;
+    result.eraBase = best.base;
+    result.resultDate = best.resultDate;
+  }
+
+  function nearestNeighborDateDistance(resultDate, target, results) {
+    const neighbors = results
+      .filter((result) => result !== target && result.resultDate && result.sourceIndex !== null)
+      .map((result) => ({ sourceDistance: Math.abs(result.sourceIndex - target.sourceIndex), dateDistance: Math.abs(dateDiff(resultDate, result.resultDate)) }))
+      .sort((a, b) => a.sourceDistance - b.sourceDistance || a.dateDistance - b.dateDistance)
+      .slice(0, 4);
+    if (!neighbors.length) return 0;
+    return Math.min(...neighbors.map((neighbor) => neighbor.dateDistance));
+  }
+
+  function dateDiff(a, b) {
+    const [ay, am, ad] = a.split('-').map(Number);
+    const [by, bm, bd] = b.split('-').map(Number);
+    return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
   }
 
   function parseTimestampDate(line) {
