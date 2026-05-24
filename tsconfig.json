@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "target": "ES2023",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.js", "test/**/*.js"]
+}

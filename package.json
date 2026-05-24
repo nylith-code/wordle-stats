@@ -1,0 +1,19 @@
+{
+  "name": "wordle-stats",
+  "version": "1.7.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run typecheck && bun run lint && bun run test",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.0"
+  }
+}
