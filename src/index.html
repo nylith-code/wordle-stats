@@ -102,17 +102,12 @@ Your group is on a 73 day streak! 🔥 Here are yesterday's results:
           <input class="w-full rounded-lg border border-white/15 bg-slate-950 px-4 py-3 text-slate-50 outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-300/10" id="excludedDates" placeholder="YYYY-MM-DD, YYYY-MM-DD">
         </label>
       </div>
-      <div class="mt-5 flex items-center gap-3 border-t border-white/10 pt-5">
-        <button class="cursor-pointer rounded-lg border-0 bg-amber-300 px-5 py-3 font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="generateReport" type="button">Generate image</button>
+      <div class="mt-5 flex flex-wrap items-center gap-4 border-t border-white/10 pt-5">
+        <button class="min-w-40 cursor-pointer rounded-lg border-0 bg-amber-300 px-5 py-3 text-center font-black text-slate-950 transition hover:-translate-y-px hover:brightness-105" id="generateReport" type="button">Generate image</button>
+        <button class="hidden min-w-40 cursor-pointer rounded-lg border border-white/15 bg-white/10 px-5 py-3 text-center font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="copyPng" type="button">Copy image</button>
+        <span class="text-sm font-bold text-green-100" id="reportStatus" hidden></span>
       </div>
       <figure class="mt-5 rounded-2xl border border-white/10 bg-slate-950 p-4" id="reportPreview" hidden>
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3" id="generatedActions" hidden>
-          <span class="text-sm font-bold leading-snug text-slate-400" id="reportStatus">Preparing image...</span>
-          <div class="flex flex-wrap items-center gap-3">
-            <a class="rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 no-underline transition hover:-translate-y-px hover:brightness-105" id="openImage" target="_blank" rel="noopener noreferrer">Open image</a>
-            <button class="cursor-pointer rounded-lg border border-white/15 bg-white/10 px-4 py-2 font-black text-slate-50 transition hover:-translate-y-px hover:brightness-105" id="copyPng" type="button">Copy image</button>
-          </div>
-        </div>
         <img class="mx-auto block h-auto max-w-full rounded-lg" id="reportImage" alt="Generated Wordle standings report">
       </figure>
     </div>

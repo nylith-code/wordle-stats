@@ -15,7 +15,7 @@
  * @typedef {{ sourceDistance: number, dateDistance: number }} NeighborDistance
  * @typedef {{ serverName: string, timeframe: Timeframe, excludedDates: string, rawText: string, aliases: Record<string, string>, flaggedUsers: string[] }} AppState
  * @typedef {{ streak: number, timestampLine: string | null, postedDate: string | null, postedHour: number | null, scores: ScoreMap, resultDate: string | null, eraBase: string | null, sourceIndex: number | null }} DailyResult
- * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportPreview: HTMLElement, reportImage: HTMLImageElement, reportStatus: HTMLElement, generatedActions: HTMLElement, generateReport: HTMLButtonElement, openImage: HTMLAnchorElement, copyPng: HTMLButtonElement, aliasRoster: HTMLElement }} Elements
+ * @typedef {{ serverName: HTMLInputElement, timeframe: HTMLSelectElement, excludedDates: HTMLInputElement, pasteBox: HTMLTextAreaElement, channelInstruction: HTMLElement, searchTerm: HTMLElement, notice: HTMLElement, reportFrame: HTMLElement, reportPreview: HTMLElement, reportImage: HTMLImageElement, reportStatus: HTMLElement, generateReport: HTMLButtonElement, copyPng: HTMLButtonElement, aliasRoster: HTMLElement }} Elements
  */
 
 const STORE_KEY = 'wordleReport.v1';
@@ -62,6 +62,8 @@ let reportGenerated = false;
 let serializedCss = null;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let noticeTimer;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let copyButtonTimer;
 
 if (typeof document !== 'undefined') init();
 
@@ -96,9 +98,7 @@ function getElements() {
     reportPreview: $('reportPreview'),
     reportImage: /** @type {HTMLImageElement} */ ($('reportImage')),
     reportStatus: $('reportStatus'),
-    generatedActions: $('generatedActions'),
     generateReport: /** @type {HTMLButtonElement} */ ($('generateReport')),
-    openImage: /** @type {HTMLAnchorElement} */ ($('openImage')),
     copyPng: /** @type {HTMLButtonElement} */ ($('copyPng')),
     aliasRoster: $('aliasRoster'),
   };
@@ -128,6 +128,7 @@ function bindEvents() {
   $('clearDataTop').addEventListener('click', clearData);
   $('generateReport').addEventListener('click', renderReport);
   $('copyPng').addEventListener('click', copyPng);
+  $('copyPng').addEventListener('mouseleave', resetCopyButton);
 }
 
 /** @returns {AppState} */
@@ -766,19 +767,22 @@ function markReportStale() {
 
 function updateReportControls() {
   assertEls().reportStatus.textContent = reportGenerated ? 'Preparing image...' : '';
+  assertEls().reportStatus.hidden = !reportGenerated;
   assertEls().generateReport.hidden = reportGenerated;
+  assertEls().copyPng.hidden = !reportGenerated;
+  assertEls().copyPng.classList.toggle('hidden', !reportGenerated);
 }
 
 function clearImagePreview() {
   lastRenderedBlob = null;
   if (lastRenderedUrl) URL.revokeObjectURL(lastRenderedUrl);
   lastRenderedUrl = null;
+  resetCopyButton();
 
   if (!els) return;
   assertEls().reportPreview.hidden = true;
-  assertEls().generatedActions.hidden = true;
+  assertEls().reportStatus.hidden = true;
   assertEls().reportImage.removeAttribute('src');
-  assertEls().openImage.removeAttribute('href');
 }
 
 async function renderImagePreview() {
@@ -793,10 +797,10 @@ async function renderImagePreview() {
   lastRenderedUrl = URL.createObjectURL(blob);
 
   assertEls().reportImage.src = lastRenderedUrl;
-  assertEls().openImage.href = lastRenderedUrl;
   assertEls().reportPreview.hidden = false;
-  assertEls().generatedActions.hidden = false;
-  assertEls().reportStatus.textContent = 'Image ready.';
+  const copied = await tryCopyBlob(blob);
+  if (copied) showCopiedButton();
+  assertEls().reportStatus.textContent = copied ? 'Image copied to clipboard! You can also see it below.' : 'Image generated. You can see it below.';
 }
 
 async function copyPng() {
@@ -804,12 +808,36 @@ async function copyPng() {
   if (!blob) return;
 
   lastRenderedBlob = blob;
+  const copied = await tryCopyBlob(blob);
+  if (copied) {
+    showCopiedButton();
+  } else {
+    assertEls().copyPng.textContent = 'Copy blocked';
+    clearTimeout(copyButtonTimer);
+    copyButtonTimer = setTimeout(resetCopyButton, 2400);
+  }
+}
+
+function showCopiedButton() {
+  assertEls().copyPng.textContent = 'Copied!';
+  clearTimeout(copyButtonTimer);
+  copyButtonTimer = setTimeout(resetCopyButton, 2400);
+}
+
+function resetCopyButton() {
+  clearTimeout(copyButtonTimer);
+  if (!els) return;
+  assertEls().copyPng.textContent = 'Copy image';
+}
+
+/** @param {Blob} blob */
+async function tryCopyBlob(blob) {
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    assertEls().reportStatus.textContent = 'Image copied.';
+    return true;
   } catch (error) {
-    assertEls().reportStatus.textContent = 'Image ready.';
-    showNotice(`Clipboard copy was blocked by the browser. (${error instanceof Error ? error.message : String(error)})`);
+    console.warn('Clipboard image copy failed.', error);
+    return false;
   }
 }
 
@@ -999,10 +1027,10 @@ function renderAliasRoster() {
         )
         .join('');
       const flagged = flaggedUsers.has(primary);
-      return `<div class="grid grid-cols-1 items-center gap-4 px-4 py-2 hover:bg-white/5 md:grid-cols-12">
-      <div class="break-words text-sm font-bold text-slate-50 md:col-span-2">${escapeHtml(primary)}</div>
-      <div class="flex flex-wrap items-center gap-2 md:col-span-9">${chipsHtml}<span><input class="w-auto min-w-40 rounded-full border border-dashed border-white/20 bg-transparent px-3 py-1 text-xs text-slate-300 outline-none focus:border-solid focus:border-sky-300 focus:text-slate-50 focus:ring-4 focus:ring-sky-300/10" type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
-      <button type="button" class="ml-auto grid size-9 cursor-pointer place-items-center rounded-full border text-base transition ${flagged ? 'border-red-400/50 bg-red-400/15 text-red-300 shadow-sm' : 'border-transparent bg-transparent text-slate-600 hover:border-white/10 hover:bg-white/10 hover:text-slate-300'}" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" aria-label="${flagged ? 'Remove conduct flag from' : 'Add conduct flag to'} ${escapeHtml(primary)}" title="History of Unsportsmanlike-Conduct">⚑</button>
+      return `<div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-4 py-2 hover:bg-white/5 md:grid-cols-12 md:gap-4">
+      <button type="button" class="grid size-8 cursor-pointer place-items-center rounded-full border text-sm transition md:col-span-1 ${flagged ? 'border-red-400/50 bg-red-400/15 text-red-300 shadow-sm' : 'border-transparent bg-transparent text-slate-600 hover:border-white/10 hover:bg-white/10 hover:text-slate-300'}" data-toggle-flag="${escapeHtml(primary)}" aria-pressed="${flagged}" aria-label="${flagged ? 'Remove conduct flag from' : 'Add conduct flag to'} ${escapeHtml(primary)}" title="History of Unsportsmanlike-Conduct">⚑</button>
+      <div class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-bold text-slate-50 md:col-span-3">${escapeHtml(primary)}</div>
+      <div class="col-span-2 flex flex-wrap items-center gap-2 md:col-span-8">${chipsHtml}<span><input class="w-auto min-w-40 rounded-full border border-dashed border-white/20 bg-transparent px-3 py-1 text-xs text-slate-300 outline-none focus:border-solid focus:border-sky-300 focus:text-slate-50 focus:ring-4 focus:ring-sky-300/10" type="text" list="aliasDatalist" placeholder="Old name…" data-add-for="${escapeHtml(primary)}" autocomplete="off" spellcheck="false"></span></div>
     </div>`;
     })
     .join('');
