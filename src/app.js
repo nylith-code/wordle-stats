@@ -717,7 +717,7 @@ async function renderReport() {
       </div>
     </section>
     <section class="mt-5 grid grid-cols-4 gap-4">
-      ${communityStatCard('Counted days', `${results.length}`)}
+      ${communityStatCard('Days Recorded', `${results.length}`)}
       ${communityStatCard('Avg players/day', avgPlayers.toFixed(1))}
       ${communityStatCard('Biggest turnout', bestDayValue, bestDaySub)}
       ${communityStatCard('Hardest puzzle', hardestDayValue, hardestDaySub)}
