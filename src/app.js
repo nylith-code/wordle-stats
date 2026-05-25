@@ -669,63 +669,68 @@ async function renderReport() {
   const avgPlayers = results.length ? totalEntries / results.length : 0;
   const bestDay = maxBy(results, (result) => Object.keys(result.scores).length);
   const hardestDay = maxBy(results, dailyAverage);
+
   const crownLeader = maxBy(rows, (row) => row[1].wins);
-  const cleanest = maxBy(rows, (row) => solveRate(row[1]) * 100000 + row[1].played);
+  const comebackKing = maxBy(rows, (row) => row[1].buckets['6']);
+  const luckyOpener = maxBy(rows, (row) => row[1].buckets['1']);
+  const hardestDayHero = hardestDay ? bestPlayerOnDay(hardestDay) : null;
+
   const period = periodLabel(results, state.timeframe || 'all');
   const community = (state.serverName || 'My Discord').trim() || 'My Discord';
-  const excludedText = excludedDates.size ? [...excludedDates].sort().map(formatDate).join(', ') : 'none';
+  const excludedText = excludedDates.size ? [...excludedDates].sort().map(formatDate).join(', ') : '';
   const flaggedUsers = flaggedUserSet(state.aliases || {});
 
   const rowHtml = rows.map(([user, stat], index) => playerRow(index + 1, user, stat, flaggedUsers)).join('');
   const winnerNames = leaders.length ? leaders.map(([user]) => playerNameHtml(user, flaggedUsers)).join(', ') : 'No qualifier';
-  const winnerScore = leaders.length ? `${averageScore(leaders[0][1]).toFixed(3)} average score` : '-';
-  const bestDayText = bestDay?.resultDate
-    ? `${formatShortDate(bestDay.resultDate)} (Wordle #${wordleNumber(bestDay.resultDate)}): ${Object.keys(bestDay.scores).length} players`
-    : '-';
-  const hardestDayText = hardestDay?.resultDate
-    ? `${formatShortDate(hardestDay.resultDate)} (Wordle #${wordleNumber(hardestDay.resultDate)}): ${dailyAverage(hardestDay).toFixed(2)} avg`
-    : '-';
-  const crownName = crownLeader ? playerNameHtml(crownLeader[0], flaggedUsers) : 'No qualifier';
-  const crownCount = crownLeader ? crownLeader[1].wins : 0;
-  const cleanName = cleanest ? playerNameHtml(cleanest[0], flaggedUsers) : 'No qualifier';
-  const cleanRate = cleanest ? (solveRate(cleanest[1]) * 100).toFixed(0) : '0';
+  const winnerScore = leaders.length ? `${averageScore(leaders[0][1]).toFixed(3)} average score` : '—';
 
-  assertEls().reportFrame.innerHTML = `<main class="mx-auto w-256 bg-gradient-to-br from-slate-950 via-slate-900 to-stone-900 p-10 font-sans text-slate-50" id="shareReport">
-    <section class="grid grid-cols-3 items-stretch gap-6">
-      <div class="col-span-2 rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl ring-1 ring-white/5">
-        <div class="text-sm font-extrabold uppercase tracking-widest text-amber-300">${escapeHtml(community)} Wordle</div>
+  const bestDayValue = bestDay?.resultDate ? `${Object.keys(bestDay.scores).length} players` : '—';
+  const bestDaySub = bestDay?.resultDate ? `${formatShortDate(bestDay.resultDate)} · Wordle #${wordleNumber(bestDay.resultDate)}` : '';
+  const hardestDayValue = hardestDay?.resultDate ? `${dailyAverage(hardestDay).toFixed(2)} avg` : '—';
+  const hardestDaySub = hardestDay?.resultDate ? `${formatShortDate(hardestDay.resultDate)} · Wordle #${wordleNumber(hardestDay.resultDate)}` : '';
+
+  const crownStat = crownLeader && crownLeader[1].wins > 0
+    ? { name: playerNameHtml(crownLeader[0], flaggedUsers), display: `${crownLeader[1].wins} crowns` }
+    : { name: 'No qualifier', display: '—' };
+  const comebackStat = comebackKing && comebackKing[1].buckets['6'] > 0
+    ? { name: playerNameHtml(comebackKing[0], flaggedUsers), display: `${comebackKing[1].buckets['6']} saves` }
+    : { name: 'No qualifier', display: '—' };
+  const luckyCount = luckyOpener ? luckyOpener[1].buckets['1'] : 0;
+  const luckyStat = luckyOpener && luckyCount > 0
+    ? { name: playerNameHtml(luckyOpener[0], flaggedUsers), display: `${luckyCount} ${luckyCount === 1 ? 'win' : 'wins'}` }
+    : { name: 'No qualifier', display: '—' };
+  const heroStat = hardestDayHero
+    ? { name: playerNameHtml(hardestDayHero.user, flaggedUsers), display: `${hardestDayHero.bucket}/6` }
+    : { name: 'Nobody solved it', display: '—' };
+
+  assertEls().reportFrame.innerHTML = `<main class="mx-auto w-256 bg-slate-950 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(251,191,36,0.10),transparent_70%)] p-10 font-sans text-slate-50" id="shareReport">
+    <section class="grid grid-cols-3 items-stretch gap-5">
+      <div class="col-span-2 flex flex-col justify-center rounded-3xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl ring-1 ring-white/5">
+        <div class="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">${escapeHtml(community)} Wordle</div>
         <h1 class="my-2 text-6xl font-black leading-none tracking-tighter">Wordle Standings</h1>
-        <div class="text-xl font-semibold text-slate-300">${escapeHtml(period)} · minimum ${minGames} games</div>
+        <div class="text-base font-semibold text-slate-300">${escapeHtml(period)}</div>
       </div>
-      <div class="flex min-w-0 flex-col justify-center rounded-3xl border border-white/15 bg-white/10 p-8 shadow-2xl ring-1 ring-white/5">
-        <div class="text-xs font-extrabold uppercase tracking-widest text-slate-300">Winner</div>
-        <div class="mt-3 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-4xl font-black leading-none tracking-tighter text-amber-300">${winnerNames}</div>
-        <div class="mt-4 text-lg font-semibold text-slate-300">${winnerScore}</div>
-      </div>
-    </section>
-    <section class="my-5 grid grid-cols-6 gap-4">
-      <div class="rounded-3xl border border-white/15 bg-slate-900/80 p-5 shadow-xl ring-1 ring-white/5">
-        <div class="text-5xl font-black tracking-tighter">${results.length}</div>
-        <div class="mt-1 text-xs font-semibold text-slate-300">counted days</div>
-      </div>
-      <div class="rounded-3xl border border-white/15 bg-slate-900/80 p-5 shadow-xl ring-1 ring-white/5">
-        <div class="text-5xl font-black tracking-tighter">${avgPlayers.toFixed(1)}</div>
-        <div class="mt-1 text-xs font-semibold text-slate-300">avg players/day</div>
-      </div>
-      <div class="col-span-2 min-w-0 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl ring-1 ring-white/5">
-        <div class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-black text-amber-200">${crownName}</div>
-        <div class="mt-1 text-4xl font-black leading-none tracking-tighter text-amber-300">${crownCount} crowns</div>
-        <div class="mt-2 text-xs font-semibold text-slate-300">most daily crowns</div>
-      </div>
-      <div class="col-span-2 min-w-0 rounded-3xl border border-green-400/20 bg-green-400/10 p-5 shadow-xl ring-1 ring-white/5">
-        <div class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-black text-green-100">${cleanName}</div>
-        <div class="mt-1 text-4xl font-black leading-none tracking-tighter text-green-100">${cleanRate}% solved</div>
-        <div class="mt-2 text-xs font-semibold text-slate-300">cleanest solver</div>
+      <div class="flex min-w-0 flex-col justify-center rounded-3xl border border-amber-300/30 bg-amber-300/[0.06] p-8 shadow-2xl ring-1 ring-amber-300/10">
+        <div class="text-xs font-bold uppercase tracking-[0.25em] text-amber-200/90">Winner</div>
+        <div class="mt-3 min-w-0 truncate text-4xl font-black leading-none tracking-tighter text-amber-300" data-fit="winner">${winnerNames}</div>
+        <div class="mt-3 text-base font-semibold text-slate-300">${escapeHtml(winnerScore)}</div>
       </div>
     </section>
-    <section class="rounded-3xl border border-white/15 bg-slate-900/85 p-4 shadow-2xl ring-1 ring-white/5">
+    <section class="mt-5 grid grid-cols-4 gap-4">
+      ${communityStatCard('Counted days', `${results.length}`)}
+      ${communityStatCard('Avg players/day', avgPlayers.toFixed(1))}
+      ${communityStatCard('Biggest turnout', bestDayValue, bestDaySub)}
+      ${communityStatCard('Hardest puzzle', hardestDayValue, hardestDaySub)}
+    </section>
+    <section class="mt-4 grid grid-cols-4 gap-4">
+      ${funStatCard('Most crowns', crownStat, 'amber')}
+      ${funStatCard('Most last-guess saves', comebackStat, 'emerald')}
+      ${funStatCard('Most first-guess wins', luckyStat, 'violet')}
+      ${funStatCard('Won the hardest day', heroStat, 'sky')}
+    </section>
+    <section class="mt-5 rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl ring-1 ring-white/5">
       <table class="w-full table-auto border-separate border-spacing-y-1 text-left text-sm tabular-nums">
-        <thead class="text-xs font-extrabold uppercase tracking-widest text-slate-300">
+        <thead class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
           <tr>
             <th class="px-3 py-2">#</th>
             <th class="px-3 py-2">Player</th>
@@ -746,10 +751,17 @@ async function renderReport() {
         </tbody>
       </table>
     </section>
-    <div class="mt-4 text-center text-xs font-semibold text-slate-300">Biggest turnout: ${escapeHtml(bestDayText)} · Hardest day: ${escapeHtml(hardestDayText)} · Misses count as 7 for averages</div>
-    <div class="mt-2 text-center text-xs font-semibold text-slate-300">Excluded dates: ${escapeHtml(excludedText)}</div>
+    <footer class="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-semibold tracking-wide text-slate-500">
+      <span>Minimum ${minGames} games</span>
+      <span aria-hidden="true">·</span>
+      <span>Misses count as 7 for averages</span>
+      ${excludedText ? `<span aria-hidden="true">·</span><span>Excluded: ${escapeHtml(excludedText)}</span>` : ''}
+      <span aria-hidden="true">·</span>
+      <span>wordle.nylith.com</span>
+    </footer>
   </main>`;
   lastRenderedReport = $('shareReport');
+  autoFitText(lastRenderedReport.querySelector('[data-fit="winner"]'), { maxFontPx: 36, minFontPx: 18 });
   reportGenerated = true;
   clearImagePreview();
   updateReportControls();
@@ -867,8 +879,9 @@ function playerNameHtml(user, flaggedUsers) {
  */
 function playerRow(rank, user, stat, flaggedUsers) {
   const b = stat.buckets;
-  return `<tr class="odd:bg-white/10">
-    <td class="rounded-l-2xl px-3 py-2 font-black text-amber-300">${rank}</td>
+  const rankColor = rank === 1 ? 'text-amber-300' : rank === 2 ? 'text-slate-200' : rank === 3 ? 'text-amber-600' : 'text-slate-500';
+  return `<tr class="odd:bg-white/[0.04]">
+    <td class="rounded-l-2xl px-3 py-2 font-black ${rankColor}">${rank}</td>
     <td class="max-w-60 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2 font-extrabold">${playerNameHtml(user, flaggedUsers)}</td>
     <td class="px-2 py-2">${averageScore(stat).toFixed(3)}</td>
     <td class="px-2 py-2">${stat.played}</td>
@@ -881,6 +894,102 @@ function playerRow(rank, user, stat, flaggedUsers) {
     <td class="px-2 py-2 font-extrabold text-slate-200">${b['6']}</td>
     <td class="rounded-r-2xl px-2 py-2 font-extrabold text-red-300">${b.X}</td>
   </tr>`;
+}
+
+/**
+ * The lowest-scoring solver on a given day. Misses don't count — they aren't
+ * heroic. Ties are broken by alphabetical name so the result is deterministic.
+ *
+ * @param {DailyResult} result
+ * @returns {{ user: string, bucket: ScoreBucket } | null}
+ */
+function bestPlayerOnDay(result) {
+  /** @type {{ user: string, bucket: ScoreBucket } | null} */
+  let best = null;
+  for (const [user, bucket] of Object.entries(result.scores)) {
+    if (bucket === 'X') continue;
+    if (!best || SCORE_VALUE[bucket] < SCORE_VALUE[best.bucket] || (SCORE_VALUE[bucket] === SCORE_VALUE[best.bucket] && user.localeCompare(best.user) < 0)) {
+      best = { user, bucket };
+    }
+  }
+  return best;
+}
+
+/**
+ * @param {string} label
+ * @param {string} value
+ * @param {string} [sub]
+ */
+function communityStatCard(label, value, sub) {
+  return `<div class="flex h-full flex-col justify-center rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-xl ring-1 ring-white/5">
+    <div class="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">${escapeHtml(label)}</div>
+    <div class="mt-3 text-4xl font-black leading-none tracking-tighter text-slate-50">${escapeHtml(value)}</div>
+    ${sub ? `<div class="mt-2 text-xs font-semibold text-slate-400">${escapeHtml(sub)}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * @typedef {{ name: string, display: string }} HighlightStat
+ * @typedef {'amber' | 'emerald' | 'violet' | 'sky'} FunStatAccent
+ */
+
+/** @type {Record<FunStatAccent, { card: string, label: string, name: string, value: string }>} */
+const FUN_STAT_PALETTE = {
+  amber: { card: 'border-amber-300/30 bg-amber-300/[0.06] ring-amber-300/10', label: 'text-amber-200/90', name: 'text-amber-100', value: 'text-amber-300' },
+  emerald: { card: 'border-emerald-300/30 bg-emerald-300/[0.06] ring-emerald-300/10', label: 'text-emerald-200/90', name: 'text-emerald-100', value: 'text-emerald-300' },
+  violet: { card: 'border-violet-300/30 bg-violet-300/[0.06] ring-violet-300/10', label: 'text-violet-200/90', name: 'text-violet-100', value: 'text-violet-300' },
+  sky: { card: 'border-sky-300/30 bg-sky-300/[0.06] ring-sky-300/10', label: 'text-sky-200/90', name: 'text-sky-100', value: 'text-sky-300' },
+};
+
+/**
+ * @param {string} label
+ * @param {HighlightStat} stat
+ * @param {FunStatAccent} accent
+ */
+function funStatCard(label, stat, accent) {
+  const c = FUN_STAT_PALETTE[accent];
+  return `<div class="flex h-full flex-col justify-center rounded-2xl border ${c.card} p-5 shadow-xl ring-1">
+    <div class="text-[10px] font-bold uppercase tracking-[0.22em] ${c.label}">${escapeHtml(label)}</div>
+    <div class="mt-3 min-w-0 truncate text-sm font-extrabold ${c.name}">${stat.name}</div>
+    <div class="mt-1 text-3xl font-black leading-none tracking-tighter ${c.value}">${escapeHtml(stat.display)}</div>
+  </div>`;
+}
+
+/**
+ * Shrink the inline font-size of `element` until its content fits within its
+ * laid-out width. Used for the winner name so long Discord handles don't get
+ * cut off by the truncate ellipsis.
+ *
+ * @param {Element | null} element
+ * @param {{ maxFontPx?: number, minFontPx?: number }} [options]
+ */
+function autoFitText(element, options = {}) {
+  if (!(element instanceof HTMLElement)) return;
+  const maxFontPx = options.maxFontPx ?? 36;
+  const minFontPx = options.minFontPx ?? 16;
+  // The inner flag-name span uses `max-w-full`, which silently caps its width
+  // to the parent and prevents scrollWidth from reporting actual overflow.
+  // Lift that cap during measurement and restore it after.
+  /** @type {{ el: HTMLElement, prev: string }[]} */
+  const restored = [];
+  for (const span of element.querySelectorAll('.max-w-full')) {
+    if (span instanceof HTMLElement) {
+      restored.push({ el: span, prev: span.style.maxWidth });
+      span.style.maxWidth = 'none';
+    }
+  }
+  try {
+    let size = maxFontPx;
+    element.style.fontSize = `${size}px`;
+    while (size > minFontPx && element.scrollWidth > element.clientWidth + 1) {
+      size -= 1;
+      element.style.fontSize = `${size}px`;
+    }
+  } finally {
+    for (const { el, prev } of restored) {
+      el.style.maxWidth = prev;
+    }
+  }
 }
 
 /** @returns {Promise<Blob | null>} */
