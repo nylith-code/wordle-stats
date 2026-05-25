@@ -706,8 +706,8 @@ async function renderReport() {
   assertEls().reportFrame.innerHTML = `<main class="mx-auto w-256 bg-slate-950 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(251,191,36,0.10),transparent_70%)] p-10 font-sans text-slate-50" id="shareReport">
     <section class="grid grid-cols-3 items-stretch gap-5">
       <div class="col-span-2 flex flex-col justify-center rounded-3xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl ring-1 ring-white/5">
-        <div class="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">${escapeHtml(community)} Wordle</div>
-        <h1 class="my-2 text-6xl font-black leading-none tracking-tighter">Wordle Standings</h1>
+        <div class="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">${escapeHtml(community)}</div>
+        <h1 class="my-2 text-6xl font-black leading-none tracking-tighter">Wordle Stats</h1>
         <div class="text-base font-semibold text-slate-300">${escapeHtml(period)}</div>
       </div>
       <div class="flex min-w-0 flex-col justify-center rounded-3xl border border-amber-300/30 bg-amber-300/[0.06] p-8 shadow-2xl ring-1 ring-amber-300/10">
